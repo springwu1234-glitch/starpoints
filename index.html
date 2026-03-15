@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="集點星球">
+<meta name="theme-color" content="#302b63">
+<title>集點星球</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#1a1a2e;font-family:'Nunito',sans-serif}
+  #root{height:100%;display:flex;justify-content:center;align-items:center}
+  ::-webkit-scrollbar{display:none}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useCallback } = React;
+
+const LEVELS = [
+  { level:1, name:"星星蛋", emoji:"🥚", min:0,   max:99,       color:"#FFE135", bg:"#FFF9E6" },
+  { level:2, name:"小光球", emoji:"✨", min:100,  max:299,      color:"#FFB347", bg:"#FFF4E6" },
+  { level:3, name:"彩蝶",   emoji:"🦋", min:300,  max:599,      color:"#FF61A6", bg:"#FFE6F4" },
+  { level:4, name:"星光獸", emoji:"🦄", min:600,  max:999,      color:"#A78BFA", bg:"#F0EBFF" },
+  { level:5, name:"神龍",   emoji:"🐉", min:1000, max:Infinity, color:"#34D399", bg:"#E6FFF5" },
+];
+const getLevel = pts => LEVELS.find(l => pts >= l.min && pts <= l.max) || LEVELS[0];
+
+const INIT_EVENTS = [
+  {id:1,name:"完成作業",    points:5,  emoji:"📚",type:"add"},
+  {id:2,name:"主動幫忙家事",points:10, emoji:"🧹",type:"add"},
+  {id:3,name:"準時起床",    points:3,  emoji:"⏰",type:"add"},
+  {id:4,name:"主動練琴",    points:8,  emoji:"🎹",type:"add"},
+  {id:5,name:"忘記收書包",  points:-3, emoji:"😅",type:"deduct"},
+  {id:6,name:"頂嘴",        points:-5, emoji:"🙅",type:"deduct"},
+];
+const INIT_REWARDS = [
+  {id:1,name:"看30分鐘YouTube",cost:20,emoji:"📺"},
+  {id:2,name:"買一個小玩具",    cost:50,emoji:"🎁"},
+  {id:3,name:"選今晚晚餐",      cost:30,emoji:"🍜"},
+  {id:4,name:"免一次洗碗",      cost:15,emoji:"🍽️"},
+];
+const INIT_HISTORY = [
+  {id:1,event:"完成作業",    points:5,  emoji:"📚",time:"今天 18:30",message:"今天數學考100分！超棒的！"},
+  {id:2,event:"主動幫忙家事",points:10, emoji:"🧹",time:"今天 12:00",message:""},
+  {id:3,event:"頂嘴",        points:-5, emoji:"🙅",time:"昨天 20:15",message:"下次說話要注意語氣喔"},
+  {id:4,event:"準時起床",    points:3,  emoji:"⏰",time:"昨天 07:00",message:"太棒了，連續3天準時！"},
+];
+
+function App() {
+  const [mode,setMode]=useState("select");
+  const [points,setPoints]=useState(87);
+  const [events,setEvents]=useState(INIT_EVENTS);
+  const [rewards,setRewards]=useState(INIT_REWARDS);
+  const [history,setHistory]=useState(INIT_HISTORY);
+  const [parentTab,setParentTab]=useState("actions");
+  const [kidTab,setKidTab]=useState("home");
+  const [floatAnim,setFloatAnim]=useState(null);
+  const [levelUpAnim,setLevelUpAnim]=useState(false);
+  const [redeemMsg,setRedeemMsg]=useState(null);
+  const [showAddEvent,setShowAddEvent]=useState(false);
+  const [newEvent,setNewEvent]=useState({name:"",points:"",emoji:"⭐",type:"add"});
+  const [pinInput,setPinInput]=useState("");
+  const [pinError,setPinError]=useState(false);
+  const PIN="1234";
+
+  const addPoints = ev => {
+    const prev=getLevel(points);
+    const np=Math.max(0,points+ev.points);
+    const nl=getLevel(np);
+    setPoints(np);
+    setFloatAnim({val:ev.points,id:Date.now()});
+    setTimeout(()=>setFloatAnim(null),1200);
+    if(nl.level>prev.level){setTimeout(()=>{setLevelUpAnim(true);setTimeout(()=>setLevelUpAnim(false),2000)},300);}
+    setHistory(h=>[{id:Date.now(),event:ev.name,points:ev.points,emoji:ev.emoji,time:"剛剛",message:""},...h]);
+  };
+
+  const redeem = r => {
+    if(points<r.cost){setRedeemMsg({text:"點數不足 😢",ok:false});}
+    else{
+      setPoints(p=>p-r.cost);
+      setRedeemMsg({text:`已兌換「${r.name}」🎉`,ok:true});
+      setHistory(h=>[{id:Date.now(),event:`兌換：${r.name}`,points:-r.cost,emoji:r.emoji,time:"剛剛",message:""},...h]);
+    }
+    setTimeout(()=>setRedeemMsg(null),2000);
+  };
+
+  const handleLogin = () => {
+    if(pinInput===PIN){setPinInput("");setPinError(false);setMode("parent");}
+    else{setPinError(true);setTimeout(()=>setPinError(false),1000);}
+  };
+
+  const lv=getLevel(points);
+  const nextLv=LEVELS.find(l=>l.level===lv.level+1);
+  const progress=nextLv?((points-lv.min)/(nextLv.min-lv.min))*100:100;
+
+  const isPhone = window.innerWidth <= 430;
+  const wrapStyle = isPhone
+    ? {width:"100%",height:"100%",borderRadius:0}
+    : {width:390,height:780,borderRadius:48,boxShadow:"0 40px 100px rgba(0,0,0,0.6)"};
+
+  return (
+    <div style={{...wrapStyle,background:"#fff",overflow:"hidden",position:"relative"}}>
+      {!isPhone && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:120,height:28,background:"#1a1a2e",borderRadius:"0 0 20px 20px",zIndex:100}}/>}
+      <div style={{width:"100%",height:"100%",overflow:"hidden",position:"relative",paddingTop:isPhone?0:0}}>
+        {mode==="select" && <ModeSelect setMode={setMode} pinInput={pinInput} setPinInput={setPinInput} handleLogin={handleLogin} pinError={pinError}/>}
+        {mode==="parent" && <ParentMode points={points} lv={lv} events={events} rewards={rewards} history={history} addPoints={addPoints} tab={parentTab} setTab={setParentTab} setMode={setMode} floatAnim={floatAnim} showAddEvent={showAddEvent} setShowAddEvent={setShowAddEvent} newEvent={newEvent} setNewEvent={setNewEvent} setEvents={setEvents}/>}
+        {mode==="kid" && <KidMode points={points} lv={lv} nextLv={nextLv} progress={progress} rewards={rewards} history={history} redeem={redeem} tab={kidTab} setTab={setKidTab} setMode={setMode} redeemMsg={redeemMsg} levelUpAnim={levelUpAnim}/>}
+      </div>
+    </div>
+  );
+}
+
+function ModeSelect({setMode,pinInput,setPinInput,handleLogin,pinError}){
+  const [showPin,setShowPin]=useState(false);
+  return (
+    <div style={{height:"100%",background:"linear-gradient(160deg,#0f0c29,#302b63,#24243e)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:20,position:"relative",overflow:"hidden"}}>
+      <div style={{fontSize:56,animation:"float 3s ease-in-out infinite"}}>⭐</div>
+      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:36,color:"#fff",letterSpacing:2}}>集點星球</div>
+      <div style={{fontSize:14,color:"rgba(255,255,255,0.6)",marginBottom:24}}>選擇你的角色</div>
+      <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
+        <button onClick={()=>setShowPin(true)} style={{border:"none",borderRadius:20,padding:"18px 20px",display:"flex",alignItems:"center",gap:14,cursor:"pointer",background:"linear-gradient(135deg,#f093fb,#f5576c)",boxShadow:"0 8px 24px rgba(240,147,251,0.4)"}}>
+          <span style={{fontSize:32}}>👩‍👧</span>
+          <span style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#fff",flex:1,textAlign:"left"}}>家長模式</span>
+          <span style={{fontSize:12,color:"rgba(255,255,255,0.8)"}}>管理點數與獎勵</span>
+          <span style={{fontSize:18}}>🔒</span>
+        </button>
+        <button onClick={()=>setMode("kid")} style={{border:"none",borderRadius:20,padding:"18px 20px",display:"flex",alignItems:"center",gap:14,cursor:"pointer",background:"linear-gradient(135deg,#4facfe,#00f2fe)",boxShadow:"0 8px 24px rgba(79,172,254,0.4)"}}>
+          <span style={{fontSize:32}}>🧒</span>
+          <span style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#fff",flex:1,textAlign:"left"}}>小寶模式</span>
+          <span style={{fontSize:12,color:"rgba(255,255,255,0.8)"}}>查看點數和寵物</span>
+          <span style={{fontSize:18}}>→</span>
+        </button>
+      </div>
+      {showPin&&(
+        <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,backdropFilter:"blur(4px)"}}>
+          <div style={{background:"#fff",borderRadius:24,padding:"28px 24px",width:280,textAlign:"center",animation:pinError?"shake 0.4s ease":"none"}}>
+            <div style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#333",marginBottom:4}}>🔐 輸入家長密碼</div>
+            <div style={{fontSize:12,color:"#aaa",marginBottom:16}}>（預設：1234）</div>
+            <input type="password" maxLength={4} placeholder="••••" value={pinInput} onChange={e=>setPinInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} autoFocus style={{width:"100%",border:`2px solid ${pinError?"#f5576c":"#e0e0e0"}`,borderRadius:12,padding:12,fontSize:24,textAlign:"center",letterSpacing:8,outline:"none",fontFamily:"'Nunito',sans-serif"}}/>
+            {pinError&&<div style={{color:"#f5576c",fontSize:13,marginTop:8}}>密碼錯誤，請再試一次</div>}
+            <div style={{display:"flex",gap:10,marginTop:16}}>
+              <button onClick={()=>{setShowPin(false);setPinInput("");}} style={{flex:1,padding:12,border:"2px solid #eee",borderRadius:12,background:"none",color:"#666",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>取消</button>
+              <button onClick={handleLogin} style={{flex:1,padding:12,border:"none",borderRadius:12,background:"linear-gradient(135deg,#f093fb,#f5576c)",color:"#fff",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>確認</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ParentMode({points,lv,events,rewards,history,addPoints,tab,setTab,setMode,floatAnim,showAddEvent,setShowAddEvent,newEvent,setNewEvent,setEvents}){
+  return(
+    <div style={{height:"100%",background:"#F8F7FF",display:"flex",flexDirection:"column",paddingTop:32}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 20px 8px"}}>
+        <div><div style={{fontFamily:"'Fredoka One',cursive",fontSize:22,color:"#333"}}>集點星球</div><div style={{fontSize:11,color:"#999"}}>家長管理介面</div></div>
+        <button onClick={()=>setMode("select")} style={{background:"#EEE",border:"none",borderRadius:20,padding:"6px 14px",fontSize:13,color:"#666",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>切換 ↩</button>
+      </div>
+      <div style={{margin:"8px 20px",background:"linear-gradient(135deg,#667eea,#764ba2)",borderRadius:20,padding:"16px 20px",display:"flex",alignItems:"center",gap:14,position:"relative"}}>
+        <div style={{fontSize:36}}>{lv.emoji}</div>
+        <div style={{flex:1}}><div style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#fff"}}>小寶</div><div style={{fontSize:12,color:"rgba(255,255,255,0.8)",marginTop:2}}>{lv.name} · Lv.{lv.level}</div></div>
+        <div style={{position:"relative",textAlign:"right"}}>
+          <div style={{fontFamily:"'Fredoka One',cursive",fontSize:40,color:"#FFE135",lineHeight:1}}>{points}</div>
+          <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>點</div>
+          {floatAnim&&<div key={floatAnim.id} style={{position:"absolute",top:-20,right:0,fontFamily:"'Fredoka One',cursive",fontSize:22,color:floatAnim.val>0?"#4ade80":"#f87171",animation:"floatUp 1.2s ease forwards",pointerEvents:"none"}}>{floatAnim.val>0?`+${floatAnim.val}`:floatAnim.val}</div>}
+        </div>
+      </div>
+      <div style={{display:"flex",margin:"12px 20px 0",background:"#eee",borderRadius:14,padding:4,gap:2}}>
+        {[["actions","快速加點"],["rewards","兌換管理"],["history","記錄"]].map(([k,l])=>(
+          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:"8px 4px",border:"none",borderRadius:10,background:tab===k?"#fff":"transparent",fontSize:12,color:tab===k?"#333":"#888",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700,boxShadow:tab===k?"0 2px 8px rgba(0,0,0,0.1)":"none",transition:"all 0.2s"}}>{l}</button>
+        ))}
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"12px 20px 20px"}}>
+        {tab==="actions"&&(
+          <div>
+            <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>加點事件</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {events.filter(e=>e.type==="add").map(e=>(
+                <button key={e.id} onClick={()=>addPoints(e)} style={{border:"none",borderRadius:14,padding:12,display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",background:"linear-gradient(135deg,#d4fc79,#96e6a1)",boxShadow:"0 4px 12px rgba(150,230,161,0.4)"}}>
+                  <span style={{fontSize:24}}>{e.emoji}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:"#333",textAlign:"center"}}>{e.name}</span>
+                  <span style={{fontFamily:"'Fredoka One',cursive",fontSize:16,color:"#333"}}>+{e.points}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:12}}>扣點事件</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              {events.filter(e=>e.type==="deduct").map(e=>(
+                <button key={e.id} onClick={()=>addPoints(e)} style={{border:"none",borderRadius:14,padding:12,display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",background:"linear-gradient(135deg,#ffecd2,#fcb69f)",boxShadow:"0 4px 12px rgba(252,182,159,0.4)"}}>
+                  <span style={{fontSize:24}}>{e.emoji}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:"#333",textAlign:"center"}}>{e.name}</span>
+                  <span style={{fontFamily:"'Fredoka One',cursive",fontSize:16,color:"#333"}}>{e.points}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={()=>setShowAddEvent(true)} style={{width:"100%",marginTop:12,padding:12,border:"2px dashed #ccc",borderRadius:14,background:"none",color:"#aaa",fontSize:14,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>＋ 新增自訂事件</button>
+          </div>
+        )}
+        {tab==="rewards"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>可兌換獎勵</div>
+            {rewards.map(r=>(
+              <div key={r.id} style={{background:"#fff",borderRadius:14,padding:"14px 16px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+                <span style={{fontSize:24}}>{r.emoji}</span>
+                <span style={{flex:1,fontSize:14,fontWeight:700,color:"#333"}}>{r.name}</span>
+                <span style={{fontFamily:"'Fredoka One',cursive",fontSize:16,color:"#667eea"}}>{r.cost}點</span>
+              </div>
+            ))}
+            <button style={{width:"100%",marginTop:4,padding:12,border:"2px dashed #ccc",borderRadius:14,background:"none",color:"#aaa",fontSize:14,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>＋ 新增獎勵</button>
+          </div>
+        )}
+        {tab==="history"&&(
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {history.map(h=>(
+              <div key={h.id} style={{background:"#fff",borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"flex-start",gap:12,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+                <span style={{fontSize:24,marginTop:2}}>{h.emoji}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:700,color:"#333"}}>{h.event}</div>
+                  {h.message&&<div style={{fontSize:12,color:"#888",marginTop:2}}>💬 {h.message}</div>}
+                  <div style={{fontSize:11,color:"#bbb",marginTop:2}}>{h.time}</div>
+                </div>
+                <span style={{fontFamily:"'Fredoka One',cursive",fontSize:18,color:h.points>0?"#4ade80":"#f87171"}}>{h.points>0?`+${h.points}`:h.points}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {showAddEvent&&(
+        <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",zIndex:50,backdropFilter:"blur(2px)"}}>
+          <div style={{background:"#fff",borderRadius:"28px 28px 0 0",padding:"28px 24px 40px",width:"100%"}}>
+            <div style={{fontFamily:"'Fredoka One',cursive",fontSize:22,color:"#333",marginBottom:20}}>新增自訂事件</div>
+            {[["名稱","text","例：讀課外書","name"],["點數","number","正數加點，負數扣點","points"],["圖示","text","貼上一個 emoji","emoji"]].map(([label,type,ph,key])=>(
+              <div key={key} style={{marginBottom:14}}>
+                <div style={{fontSize:12,fontWeight:800,color:"#888",marginBottom:6,textTransform:"uppercase"}}>{label}</div>
+                <input type={type} placeholder={ph} value={newEvent[key]} onChange={e=>setNewEvent(n=>({...n,[key]:e.target.value}))} style={{width:"100%",border:"2px solid #eee",borderRadius:12,padding:12,fontSize:15,fontFamily:"'Nunito',sans-serif",outline:"none"}}/>
+              </div>
+            ))}
+            <div style={{display:"flex",gap:10,marginTop:20}}>
+              <button onClick={()=>setShowAddEvent(false)} style={{flex:1,padding:14,border:"2px solid #eee",borderRadius:14,background:"none",color:"#666",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>取消</button>
+              <button onClick={()=>{
+                if(!newEvent.name||!newEvent.points)return;
+                const pts=parseInt(newEvent.points);
+                setEvents(ev=>[...ev,{id:Date.now(),name:newEvent.name,points:pts,emoji:newEvent.emoji||"⭐",type:pts>=0?"add":"deduct"}]);
+                setNewEvent({name:"",points:"",emoji:"⭐",type:"add"});
+                setShowAddEvent(false);
+              }} style={{flex:1,padding:14,border:"none",borderRadius:14,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>新增</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function KidMode({points,lv,nextLv,progress,rewards,history,redeem,tab,setTab,setMode,redeemMsg,levelUpAnim}){
+  return(
+    <div style={{height:"100%",background:"linear-gradient(180deg,#0f0c29 0%,#302b63 50%,#24243e 100%)",display:"flex",flexDirection:"column",paddingTop:32,overflow:"hidden"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 20px 8px"}}>
+        <div style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#fff"}}>✨ 小寶的星球</div>
+        <button onClick={()=>setMode("select")} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:20,padding:"6px 14px",fontSize:13,color:"#fff",cursor:"pointer"}}>↩</button>
+      </div>
+      <div style={{display:"flex",margin:"0 20px 12px",background:"rgba(255,255,255,0.1)",borderRadius:14,padding:4,gap:2}}>
+        {[["home","我的星球"],["shop","兌換商城"],["log","獲得記錄"]].map(([k,l])=>(
+          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:"8px 4px",border:"none",borderRadius:10,background:tab===k?"rgba(255,255,255,0.2)":"transparent",fontSize:11,color:tab===k?"#fff":"rgba(255,255,255,0.6)",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700,transition:"all 0.2s"}}>{l}</button>
+        ))}
+      </div>
+      {tab==="home"&&(
+        <div style={{flex:1,overflowY:"auto",padding:"0 20px 20px",display:"flex",flexDirection:"column",gap:14}}>
+          <div style={{borderRadius:24,padding:24,display:"flex",flexDirection:"column",alignItems:"center",gap:8,position:"relative",overflow:"hidden",background:lv.bg,animation:levelUpAnim?"levelUp 0.6s ease":"none"}}>
+            <div style={{fontSize:72,animation:"float 3s ease-in-out infinite",filter:"drop-shadow(0 8px 16px rgba(0,0,0,0.3))"}}>{lv.emoji}</div>
+            <div style={{fontFamily:"'Fredoka One',cursive",fontSize:22,color:lv.color}}>{lv.name}</div>
+            <div style={{fontSize:13,color:"#666",fontWeight:700}}>Lv.{lv.level}</div>
+            {levelUpAnim&&<div style={{position:"absolute",top:12,right:12,background:"#FFE135",color:"#333",fontSize:13,fontWeight:800,padding:"4px 10px",borderRadius:20,animation:"pop 0.4s ease"}}>🎉 升級了！</div>}
+          </div>
+          <div style={{background:"rgba(255,255,255,0.1)",borderRadius:20,padding:"16px 20px",backdropFilter:"blur(10px)"}}>
+            <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>我的點數</div>
+            <div style={{fontFamily:"'Fredoka One',cursive",fontSize:52,color:"#FFE135",lineHeight:1}}>{points}<span style={{fontSize:20,marginLeft:4}}>點</span></div>
+            <div style={{marginTop:10}}>
+              <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",marginBottom:6}}>{nextLv?`距離 ${nextLv.name} 還差 ${nextLv.min-points} 點`:"已達最高等級 🏆"}</div>
+              <div style={{height:8,background:"rgba(255,255,255,0.15)",borderRadius:99,overflow:"hidden"}}>
+                <div style={{height:"100%",borderRadius:99,background:lv.color,width:`${Math.min(progress,100)}%`,transition:"width 0.6s ease"}}/>
+              </div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            {[{e:"🏅",l:"第一次得點"},{e:"📚",l:"學習達人"},{e:"🌟",l:"連續7天"}].map((b,i)=>(
+              <div key={i} style={{flex:1,background:"rgba(255,255,255,0.1)",borderRadius:16,padding:"12px 8px",textAlign:"center",backdropFilter:"blur(10px)"}}>
+                <div style={{fontSize:24}}>{b.e}</div>
+                <div style={{fontSize:10,color:"rgba(255,255,255,0.7)",marginTop:4,fontWeight:700}}>{b.l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {tab==="shop"&&(
+        <div style={{flex:1,overflowY:"auto",padding:"0 20px 20px"}}>
+          <div style={{background:"rgba(255,255,255,0.1)",borderRadius:14,padding:"12px 16px",fontSize:14,color:"rgba(255,255,255,0.8)",marginBottom:12,backdropFilter:"blur(10px)"}}>
+            我有 <strong style={{color:"#FFE135",fontFamily:"'Fredoka One',cursive",fontSize:18}}>{points}</strong> 點可以用
+          </div>
+          {redeemMsg&&<div style={{borderRadius:14,padding:"12px 16px",fontSize:14,fontWeight:700,marginBottom:12,textAlign:"center",background:redeemMsg.ok?"rgba(74,222,128,0.3)":"rgba(248,113,113,0.3)",color:redeemMsg.ok?"#4ade80":"#f87171"}}>{redeemMsg.text}</div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {rewards.map(r=>(
+              <div key={r.id} style={{background:"rgba(255,255,255,0.12)",borderRadius:18,padding:"16px 12px",textAlign:"center",backdropFilter:"blur(10px)",opacity:points<r.cost?0.5:1}}>
+                <div style={{fontSize:32}}>{r.emoji}</div>
+                <div style={{fontSize:12,color:"#fff",fontWeight:700,margin:"6px 0 4px"}}>{r.name}</div>
+                <div style={{fontFamily:"'Fredoka One',cursive",fontSize:16,color:"#FFE135",marginBottom:10}}>{r.cost} 點</div>
+                <button onClick={()=>redeem(r)} disabled={points<r.cost} style={{width:"100%",padding:8,border:"none",borderRadius:10,background:points<r.cost?"rgba(255,255,255,0.1)":"linear-gradient(135deg,#4facfe,#00f2fe)",color:points<r.cost?"rgba(255,255,255,0.5)":"#fff",fontSize:12,fontWeight:800,cursor:points<r.cost?"not-allowed":"pointer",fontFamily:"'Nunito',sans-serif"}}>
+                  {points<r.cost?`差 ${r.cost-points} 點`:"兌換！"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {tab==="log"&&(
+        <div style={{flex:1,overflowY:"auto",padding:"0 20px 20px",display:"flex",flexDirection:"column",gap:8}}>
+          {history.map(h=>(
+            <div key={h.id} style={{background:"rgba(255,255,255,0.08)",borderRadius:16,padding:"12px 16px",display:"flex",alignItems:"flex-start",gap:12,backdropFilter:"blur(10px)"}}>
+              <div style={{fontSize:24,marginTop:2}}>{h.emoji}</div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:14,fontWeight:700,color:"#fff"}}>{h.event}</div>
+                {h.message&&<div style={{fontSize:12,color:"rgba(255,255,255,0.6)",marginTop:2}}>💬 {h.message}</div>}
+                <div style={{fontSize:11,color:"rgba(255,255,255,0.4)",marginTop:2}}>{h.time}</div>
+              </div>
+              <div style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:h.points>0?"#4ade80":"#f87171"}}>{h.points>0?`+${h.points}`:h.points}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App/>);
+</script>
+<style>
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  @keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-40px)}}
+  @keyframes levelUp{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+  @keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+</style>
+<script>
+  if('serviceWorker' in navigator){
+    window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js'));
+  }
+</script>
+</body>
+</html>
