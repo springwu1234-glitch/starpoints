@@ -9,562 +9,850 @@
 <meta name="apple-mobile-web-app-title" content="集點星球">
 <meta name="theme-color" content="#302b63">
 <title>集點星球</title>
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
-  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%;overflow:hidden;background:#1a1a2e;font-family:'Nunito',sans-serif}
-  #root{height:100%;display:flex;justify-content:center;align-items:center}
-  ::-webkit-scrollbar{display:none}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#1a1a2e;font-family:'Nunito',sans-serif}
+#root{height:100%;display:flex;justify-content:center;align-items:center}
+::-webkit-scrollbar{display:none}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-50px)}}
+@keyframes levelUp{0%{transform:scale(1)}50%{transform:scale(1.1)}100%{transform:scale(1)}}
+@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+@keyframes confetti{0%{transform:translateY(0) rotate(0deg);opacity:1}100%{transform:translateY(120vh) rotate(540deg);opacity:0}}
+@keyframes twinkle{0%,100%{opacity:.2}50%{opacity:.9}}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useCallback } = React;
+const {useState,useMemo,useRef,useCallback}=React;
 
-const LEVELS = [
-  { level:1, name:"星星蛋", emoji:"🥚", min:0,   max:99,       color:"#FFE135", bg:"#FFF9E6" },
-  { level:2, name:"小光球", emoji:"✨", min:100,  max:299,      color:"#FFB347", bg:"#FFF4E6" },
-  { level:3, name:"彩蝶",   emoji:"🦋", min:300,  max:599,      color:"#FF61A6", bg:"#FFE6F4" },
-  { level:4, name:"星光獸", emoji:"🦄", min:600,  max:999,      color:"#A78BFA", bg:"#F0EBFF" },
-  { level:5, name:"神龍",   emoji:"🐉", min:1000, max:Infinity, color:"#34D399", bg:"#E6FFF5" },
+const LEVELS=[
+  {level:1,name:"星星蛋",emoji:"🥚",min:0,  max:99,  color:"#FFD700",bg:"#FFFBEB",desc:"神秘蛋，快點孵化吧！"},
+  {level:2,name:"小光球",emoji:"✨",min:100,max:299, color:"#FFB347",bg:"#FFF4E6",desc:"閃亮登場的能量小球"},
+  {level:3,name:"彩蝶",  emoji:"🦋",min:300,max:599, color:"#FF61A6",bg:"#FFE6F4",desc:"展翅飛翔的美麗彩蝶"},
+  {level:4,name:"星光獸",emoji:"🦄",min:600,max:999, color:"#A78BFA",bg:"#F0EBFF",desc:"稀有神祕的獨角獸"},
+  {level:5,name:"神龍",  emoji:"🐉",min:1000,max:Infinity,color:"#34D399",bg:"#E6FFF5",desc:"傳說中的究極神龍！"},
 ];
-const getLevel = pts => LEVELS.find(l => pts >= l.min && pts <= l.max) || LEVELS[0];
+const getLevel=pts=>LEVELS.find(l=>pts>=l.min&&pts<=l.max)||LEVELS[0];
 
-const INIT_EVENTS = [
-  {id:1,name:"完成作業",    points:5,  emoji:"📚",type:"add"},
-  {id:2,name:"主動幫忙家事",points:10, emoji:"🧹",type:"add"},
-  {id:3,name:"準時起床",    points:3,  emoji:"⏰",type:"add"},
-  {id:4,name:"主動練琴",    points:8,  emoji:"🎹",type:"add"},
-  {id:5,name:"忘記收書包",  points:-3, emoji:"😅",type:"deduct"},
-  {id:6,name:"頂嘴",        points:-5, emoji:"🙅",type:"deduct"},
+const SAVINGS_OPTS=[
+  {days:7, rate:.03,label:"7天", bonus:"+3%"},
+  {days:14,rate:.05,label:"14天",bonus:"+5%"},
+  {days:30,rate:.10,label:"30天",bonus:"+10%"},
 ];
-const INIT_REWARDS = [
+const EV_EMOJIS=["📚","✏️","🎒","🏃","🧹","🍳","🛁","⏰","🎹","🎨","🏅","⭐","😊","💪","🌟","🎯","📖","🧩","🏆","🚀","😅","🙅","😤","📱","🎮","🍭","🛏️","💤","🗣️","😠"];
+const RW_EMOJIS=["🎁","🍭","🍕","🍦","🎮","📱","🎬","🏖️","🛍️","📚","🎨","🎭","🚀","🏆","⭐","🌈","🎪","🍰","🎂","🧁","🍩","🎵","🎸","🎤","🏀","⚽","🎯","🎠","🎡","🎢"];
+
+const INIT_EVENTS=[
+  {id:1,name:"完成作業",    pts:5, emoji:"📚",type:"add"},
+  {id:2,name:"主動幫忙家事",pts:10,emoji:"🧹",type:"add"},
+  {id:3,name:"準時起床",    pts:3, emoji:"⏰",type:"add"},
+  {id:4,name:"主動練琴",    pts:8, emoji:"🎹",type:"add"},
+  {id:5,name:"忘記收書包",  pts:-3,emoji:"😅",type:"deduct"},
+  {id:6,name:"頂嘴",        pts:-5,emoji:"🙅",type:"deduct"},
+];
+const INIT_REWARDS=[
   {id:1,name:"看30分鐘YouTube",cost:20,emoji:"📺"},
   {id:2,name:"買一個小玩具",    cost:50,emoji:"🎁"},
   {id:3,name:"選今晚晚餐",      cost:30,emoji:"🍜"},
   {id:4,name:"免一次洗碗",      cost:15,emoji:"🍽️"},
 ];
-const INIT_HISTORY = [
-  {id:1,event:"完成作業",    points:5,  emoji:"📚",time:"今天 18:30",message:"今天數學考100分！超棒的！"},
-  {id:2,event:"主動幫忙家事",points:10, emoji:"🧹",time:"今天 12:00",message:""},
-  {id:3,event:"頂嘴",        points:-5, emoji:"🙅",time:"昨天 20:15",message:"下次說話要注意語氣喔"},
-  {id:4,event:"準時起床",    points:3,  emoji:"⏰",time:"昨天 07:00",message:"太棒了，連續3天準時！"},
+const INIT_TASKS=[
+  {id:1,name:"自己整理書包",       pts:5,emoji:"🎒",status:"pending"},
+  {id:2,name:"今天主動看書30分鐘", pts:8,emoji:"📖",status:"reported"},
+];
+const INIT_HIST=[
+  {id:1,event:"完成作業",    pts:5, emoji:"📚",time:"今天 18:30",msg:"數學考100分！超棒！",type:"earn"},
+  {id:2,event:"主動幫忙家事",pts:10,emoji:"🧹",time:"今天 12:00",msg:"",type:"earn"},
+  {id:3,event:"頂嘴",        pts:-5,emoji:"🙅",time:"昨天 20:15",msg:"下次注意語氣喔",type:"deduct"},
 ];
 
-function App() {
+/* ── audio ── */
+function beep(type){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const g=ctx.createGain();g.connect(ctx.destination);
+    const seq=type==="redeem"?[[523,0],[659,.12],[784,.24],[1047,.38]]:
+               type==="piggy" ?[[392,0],[523,.15],[659,.3]]:[[440,0],[880,.15]];
+    seq.forEach(([f,t])=>{
+      const o=ctx.createOscillator();o.connect(g);o.type="sine";
+      o.frequency.setValueAtTime(f,ctx.currentTime+t);
+      g.gain.setValueAtTime(.22,ctx.currentTime+t);
+      g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+t+.35);
+      o.start(ctx.currentTime+t);o.stop(ctx.currentTime+t+.4);
+    });
+  }catch(e){}
+}
+
+/* ── Confetti ── */
+function Confetti({show}){
+  const items=useMemo(()=>Array.from({length:20},(_,i)=>({
+    e:["🎉","⭐","🌟","🎊","✨","🎁","💫","🏆","🎈","🌈"][i%10],
+    l:5+Math.random()*90,d:Math.random()*.6,r:.9+Math.random()
+  })),[]);
+  if(!show)return null;
+  return <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:200,overflow:"hidden"}}>
+    {items.map((c,i)=><div key={i} style={{position:"absolute",left:`${c.l}%`,top:"-6%",fontSize:22,
+      animation:`confetti ${c.r}s ease forwards`,animationDelay:`${c.d}s`}}>{c.e}</div>)}
+  </div>;
+}
+
+/* ── NumPad ── */
+function PinDots({val,max=4}){
+  return <div style={{display:"flex",gap:10,justifyContent:"center",margin:"12px 0"}}>
+    {Array.from({length:max}).map((_,i)=><div key={i} style={{width:13,height:13,borderRadius:"50%",
+      background:i<val.length?"#764ba2":"#ddd",transition:"background .15s"}}/>)}
+  </div>;
+}
+function NumPad({val,setVal,max=4,onOk,onCancel,err,okLabel="確認"}){
+  const keys=["1","2","3","4","5","6","7","8","9","","0","⌫"];
+  return <div>
+    <PinDots val={val} max={max}/>
+    {err&&<p style={{color:"#f5576c",fontSize:13,textAlign:"center",marginBottom:8}}>{err}</p>}
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+      {keys.map((k,i)=>k===""?<div key={i}/>:
+        <button key={i} onClick={()=>k==="⌫"?setVal(v=>v.slice(0,-1)):val.length<max&&setVal(v=>v+k)}
+          style={{padding:"12px 0",border:"2px solid #eee",borderRadius:12,
+            background:k==="⌫"?"#fff5f5":"#fafafa",fontSize:k==="⌫"?18:20,
+            fontWeight:700,cursor:"pointer",color:k==="⌫"?"#f87171":"#333",fontFamily:"'Nunito',sans-serif"}}>{k}</button>
+      )}
+    </div>
+    <div style={{display:"flex",gap:8}}>
+      <button onClick={onCancel} style={{flex:1,padding:12,border:"2px solid #eee",borderRadius:14,background:"none",color:"#666",fontSize:14,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>取消</button>
+      <button onClick={onOk} style={{flex:1,padding:12,border:"none",borderRadius:14,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",fontSize:14,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>{okLabel}</button>
+    </div>
+  </div>;
+}
+
+/* ── shared UI helpers ── */
+const ModalWrap=({children,onClose})=><div onClick={onClose}
+  style={{position:"absolute",inset:0,background:"rgba(0,0,0,.55)",display:"flex",alignItems:"flex-end",zIndex:60,backdropFilter:"blur(3px)"}}>
+  <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"28px 28px 0 0",padding:"22px 20px 36px",width:"100%",maxHeight:"88vh",overflowY:"auto"}}>{children}</div>
+</div>;
+
+const FL=({c})=><div style={{fontSize:11,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>{c}</div>;
+const FI=({label,value,onChange,mode="text",ph=""})=><div style={{marginBottom:12}}>
+  <FL c={label}/>
+  <input inputMode={mode} placeholder={ph} value={value} onChange={onChange}
+    style={{width:"100%",border:"2px solid #eee",borderRadius:12,padding:11,fontSize:15,fontFamily:"'Nunito',sans-serif",outline:"none"}}/>
+</div>;
+const EmojiPick=({val,set,opts})=><div style={{marginBottom:14}}>
+  <FL c="圖示（點選或輸入）"/>
+  <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:7}}>
+    {opts.map(e=><button key={e} onClick={()=>set(e)}
+      style={{width:35,height:35,border:`2px solid ${val===e?"#764ba2":"transparent"}`,borderRadius:8,
+        background:val===e?"#f0ebff":"#f5f5f5",fontSize:17,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{e}</button>)}
+  </div>
+  <input placeholder="或貼上其他 emoji" value={val} onChange={e=>set(e.target.value)}
+    style={{width:"100%",border:"2px solid #eee",borderRadius:12,padding:9,fontSize:20,outline:"none",textAlign:"center"}}/>
+</div>;
+const MBtns=({onCancel,onOk,okLabel})=><div style={{display:"flex",gap:8,marginTop:4}}>
+  <button onClick={onCancel} style={{flex:1,padding:12,border:"2px solid #eee",borderRadius:14,background:"none",color:"#666",fontSize:14,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>取消</button>
+  <button onClick={onOk} style={{flex:1,padding:12,border:"none",borderRadius:14,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",fontSize:14,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>{okLabel}</button>
+</div>;
+const MTtl=({c})=><div style={{fontFamily:"'Fredoka One',cursive",fontSize:21,color:"#333",marginBottom:14}}>{c}</div>;
+
+/* ═══════════════════════════════════════════════════ APP ═══ */
+function App(){
   const [mode,setMode]=useState("select");
-  const [points,setPoints]=useState(87);
+  const [pts,setPts]=useState(87);
   const [events,setEvents]=useState(INIT_EVENTS);
   const [rewards,setRewards]=useState(INIT_REWARDS);
-  const [history,setHistory]=useState(INIT_HISTORY);
-  const [parentTab,setParentTab]=useState("actions");
-  const [kidTab,setKidTab]=useState("home");
+  const [tasks,setTasks]=useState(INIT_TASKS);
+  const [hist,setHist]=useState(INIT_HIST);
+  const [savings,setSavings]=useState([]);
+  const [pTab,setPTab]=useState("actions");
+  const [kTab,setKTab]=useState("home");
   const [floatAnim,setFloatAnim]=useState(null);
-  const [levelUpAnim,setLevelUpAnim]=useState(false);
-  const [redeemMsg,setRedeemMsg]=useState(null);
-  const [showAddEvent,setShowAddEvent]=useState(false);
-  const [editingEvent,setEditingEvent]=useState(null); // event being edited
-  const [newEvent,setNewEvent]=useState({name:"",points:"",emoji:"⭐",type:"add"});
-  const [showAddReward,setShowAddReward]=useState(false);
-  const [editingReward,setEditingReward]=useState(null);
-  const [newReward,setNewReward]=useState({name:"",cost:"",emoji:"🎁"});
-  const [pinInput,setPinInput]=useState("");
-  const [pinError,setPinError]=useState(false);
+  const [lvUp,setLvUp]=useState(false);
+  const [celebrate,setCelebrate]=useState(false);
   const [PIN,setPIN]=useState("1234");
   const [kidName,setKidName]=useState("小寶");
+  const [avatar,setAvatar]=useState(null);
+  const [pinInput,setPinInput]=useState("");
+  const [pinErr,setPinErr]=useState(false);
+  /* modal states */
+  const [evModal,setEvModal]=useState(false);
+  const [editEv,setEditEv]=useState(null);
+  const [newEv,setNewEv]=useState({name:"",pts:"",emoji:"⭐",type:"add"});
+  const [rwModal,setRwModal]=useState(false);
+  const [editRw,setEditRw]=useState(null);
+  const [newRw,setNewRw]=useState({name:"",cost:"",emoji:"🎁"});
+  const [taskModal,setTaskModal]=useState(false);
+  const [newTask,setNewTask]=useState({name:"",pts:"",emoji:"📋"});
+  const [pigModal,setPigModal]=useState(false);
+  const [pigInput,setPigInput]=useState({amount:"",opt:0});
 
-  const addPoints = ev => {
-    const prev=getLevel(points);
-    const np=Math.max(0,points+ev.points);
+  const addPts=useCallback((ev)=>{
+    const prev=getLevel(pts);
+    const np=Math.max(0,pts+ev.pts);
+    setPts(np);
     const nl=getLevel(np);
-    setPoints(np);
-    setFloatAnim({val:ev.points,id:Date.now()});
-    setTimeout(()=>setFloatAnim(null),1200);
-    if(nl.level>prev.level){setTimeout(()=>{setLevelUpAnim(true);setTimeout(()=>setLevelUpAnim(false),2000)},300);}
-    setHistory(h=>[{id:Date.now(),event:ev.name,points:ev.points,emoji:ev.emoji,time:"剛剛",message:""},...h]);
+    setFloatAnim({val:ev.pts,id:Date.now()});
+    setTimeout(()=>setFloatAnim(null),1300);
+    if(nl.level>prev.level)setTimeout(()=>{setLvUp(true);setTimeout(()=>setLvUp(false),2200)},200);
+    beep("pts");
+    setHist(h=>[{id:Date.now(),event:ev.name,pts:ev.pts,emoji:ev.emoji,time:"剛剛",msg:"",type:ev.pts>0?"earn":"deduct"},...h]);
+  },[pts]);
+
+  const redeem=useCallback((r)=>{
+    if(pts<r.cost)return;
+    setPts(p=>p-r.cost);
+    setCelebrate(true);setTimeout(()=>setCelebrate(false),2300);
+    beep("redeem");
+    setHist(h=>[{id:Date.now(),event:`兌換：${r.name}`,pts:-r.cost,emoji:r.emoji,time:"剛剛",msg:"",type:"redeem"},...h]);
+  },[pts]);
+
+  const confirmTask=useCallback((tid)=>{
+    const t=tasks.find(x=>x.id===tid);if(!t)return;
+    setTasks(ts=>ts.map(x=>x.id===tid?{...x,status:"done"}:x));
+    addPts({name:`完成任務：${t.name}`,pts:t.pts,emoji:t.emoji});
+  },[tasks,addPts]);
+
+  const deposit=useCallback(()=>{
+    const amt=parseInt(pigInput.amount);
+    const opt=SAVINGS_OPTS[pigInput.opt];
+    if(!amt||amt<=0||amt>pts)return;
+    setPts(p=>p-amt);
+    setSavings(s=>[...s,{id:Date.now(),amount:amt,depositDate:Date.now(),days:opt.days,rate:opt.rate}]);
+    beep("piggy");
+    setPigModal(false);setPigInput({amount:"",opt:0});
+  },[pigInput,pts]);
+
+  const mature=useCallback((sid)=>{
+    const d=savings.find(s=>s.id===sid);if(!d)return;
+    const ret=Math.round(d.amount*(1+d.rate));
+    setPts(p=>p+ret);
+    setSavings(s=>s.filter(x=>x.id!==sid));
+    setHist(h=>[{id:Date.now(),event:`存款到期領取（${d.days}天）`,pts:ret,emoji:"🐷",time:"剛剛",msg:`本金${d.amount}＋利息${ret-d.amount}點`,type:"earn"},...h]);
+    beep("pts");
+  },[savings]);
+
+  const login=()=>{
+    if(pinInput===PIN){setPinInput("");setPinErr(false);setMode("parent");}
+    else{setPinErr(true);setTimeout(()=>setPinErr(false),1000);}
   };
 
-  const redeem = r => {
-    if(points<r.cost){setRedeemMsg({text:"點數不足 😢",ok:false});}
-    else{
-      setPoints(p=>p-r.cost);
-      setRedeemMsg({text:`已兌換「${r.name}」🎉`,ok:true});
-      setHistory(h=>[{id:Date.now(),event:`兌換：${r.name}`,points:-r.cost,emoji:r.emoji,time:"剛剛",message:""},...h]);
-    }
-    setTimeout(()=>setRedeemMsg(null),2000);
-  };
-
-  const handleLogin = () => {
-    if(pinInput===PIN){setPinInput("");setPinError(false);setMode("parent");}
-    else{setPinError(true);setTimeout(()=>setPinError(false),1000);}
-  };
-
-  const openEditEvent = (ev) => {
-    setEditingEvent(ev);
-    setNewEvent({name:ev.name, points:String(ev.points), emoji:ev.emoji, type:ev.type});
-    setShowAddEvent(true);
-  };
-  const deleteEvent = (id) => setEvents(ev=>ev.filter(e=>e.id!==id));
-
-  const openEditReward = (r) => {
-    setEditingReward(r);
-    setNewReward({name:r.name, cost:String(r.cost), emoji:r.emoji});
-    setShowAddReward(true);
-  };
-  const deleteReward = (id) => setRewards(r=>r.filter(x=>x.id!==id));
-
-  const lv=getLevel(points);
+  const lv=getLevel(pts);
   const nextLv=LEVELS.find(l=>l.level===lv.level+1);
-  const progress=nextLv?((points-lv.min)/(nextLv.min-lv.min))*100:100;
+  const progress=nextLv?((pts-lv.min)/(nextLv.min-lv.min))*100:100;
+  const isPhone=window.innerWidth<=430;
+  const wrap=isPhone?{width:"100%",height:"100%",borderRadius:0}:{width:390,height:780,borderRadius:48,boxShadow:"0 40px 100px rgba(0,0,0,.65)"};
 
-  const isPhone = window.innerWidth <= 430;
-  const wrapStyle = isPhone
-    ? {width:"100%",height:"100%",borderRadius:0}
-    : {width:390,height:780,borderRadius:48,boxShadow:"0 40px 100px rgba(0,0,0,0.6)"};
+  const pp={pts,lv,events,setEvents,rewards,setRewards,tasks,setTasks,hist,setHist,
+    addPts,redeem,confirmTask,setPts,floatAnim,tab:pTab,setTab:setPTab,setMode,
+    evModal,setEvModal,editEv,setEditEv,newEv,setNewEv,
+    rwModal,setRwModal,editRw,setEditRw,newRw,setNewRw,
+    taskModal,setTaskModal,newTask,setNewTask,
+    savings,mature,PIN,setPIN,kidName,setKidName,avatar,setAvatar};
+  const kp={pts,lv,nextLv,progress,rewards,redeem,tasks,setTasks,hist,savings,
+    pigModal,setPigModal,pigInput,setPigInput,deposit,
+    tab:kTab,setTab:setKTab,setMode,lvUp,kidName,avatar};
 
-  return (
-    <div style={{...wrapStyle,background:"#fff",overflow:"hidden",position:"relative"}}>
-      {!isPhone && <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:120,height:28,background:"#1a1a2e",borderRadius:"0 0 20px 20px",zIndex:100}}/>}
-      <div style={{width:"100%",height:"100%",overflow:"hidden",position:"relative"}}>
-        {mode==="select" && <ModeSelect setMode={setMode} pinInput={pinInput} setPinInput={setPinInput} handleLogin={handleLogin} pinError={pinError} kidName={kidName}/>}
-        {mode==="parent" && <ParentMode points={points} lv={lv} events={events} rewards={rewards} history={history} addPoints={addPoints} tab={parentTab} setTab={setParentTab} setMode={setMode} floatAnim={floatAnim} showAddEvent={showAddEvent} setShowAddEvent={setShowAddEvent} editingEvent={editingEvent} setEditingEvent={setEditingEvent} newEvent={newEvent} setNewEvent={setNewEvent} setEvents={setEvents} openEditEvent={openEditEvent} deleteEvent={deleteEvent} showAddReward={showAddReward} setShowAddReward={setShowAddReward} editingReward={editingReward} setEditingReward={setEditingReward} newReward={newReward} setNewReward={setNewReward} setRewards={setRewards} openEditReward={openEditReward} deleteReward={deleteReward} PIN={PIN} setPIN={setPIN} kidName={kidName} setKidName={setKidName}/>}
-        {mode==="kid" && <KidMode points={points} lv={lv} nextLv={nextLv} progress={progress} rewards={rewards} history={history} redeem={redeem} tab={kidTab} setTab={setKidTab} setMode={setMode} redeemMsg={redeemMsg} levelUpAnim={levelUpAnim} kidName={kidName}/>}
-      </div>
+  return <div style={{...wrap,background:"#fff",overflow:"hidden",position:"relative"}}>
+    {!isPhone&&<div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:120,height:28,background:"#1a1a2e",borderRadius:"0 0 20px 20px",zIndex:100}}/>}
+    <Confetti show={celebrate}/>
+    <div style={{width:"100%",height:"100%",overflow:"hidden",position:"relative"}}>
+      {mode==="select"&&<SelectScreen login={login} pinInput={pinInput} setPinInput={setPinInput} pinErr={pinErr} kidName={kidName} avatar={avatar} setMode={setMode}/>}
+      {mode==="parent"&&<ParentScreen {...pp}/>}
+      {mode==="kid"&&<KidScreen {...kp}/>}
     </div>
-  );
+  </div>;
 }
 
-function ModeSelect({setMode,pinInput,setPinInput,handleLogin,pinError,kidName}){
+/* ═══════════════════════════════════════════════ SELECT ═══ */
+function SelectScreen({login,pinInput,setPinInput,pinErr,kidName,avatar,setMode}){
   const [showPin,setShowPin]=useState(false);
-  return (
-    <div style={{height:"100%",background:"linear-gradient(160deg,#0f0c29,#302b63,#24243e)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,padding:20,position:"relative",overflow:"hidden"}}>
-      <div style={{fontSize:56,animation:"float 3s ease-in-out infinite"}}>⭐</div>
-      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:36,color:"#fff",letterSpacing:2}}>集點星球</div>
-      <div style={{fontSize:14,color:"rgba(255,255,255,0.6)",marginBottom:24}}>選擇你的角色</div>
-      <div style={{display:"flex",flexDirection:"column",gap:12,width:"100%"}}>
-        <button onClick={()=>setShowPin(true)} style={{border:"none",borderRadius:20,padding:"18px 20px",display:"flex",alignItems:"center",gap:14,cursor:"pointer",background:"linear-gradient(135deg,#f093fb,#f5576c)",boxShadow:"0 8px 24px rgba(240,147,251,0.4)"}}>
-          <span style={{fontSize:32}}>👩‍👧</span>
-          <span style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#fff",flex:1,textAlign:"left"}}>家長模式</span>
-          <span style={{fontSize:12,color:"rgba(255,255,255,0.8)"}}>管理點數與獎勵</span>
-          <span style={{fontSize:18}}>🔒</span>
-        </button>
-        <button onClick={()=>setMode("kid")} style={{border:"none",borderRadius:20,padding:"18px 20px",display:"flex",alignItems:"center",gap:14,cursor:"pointer",background:"linear-gradient(135deg,#4facfe,#00f2fe)",boxShadow:"0 8px 24px rgba(79,172,254,0.4)"}}>
-          <span style={{fontSize:32}}>🧒</span>
-          <span style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#fff",flex:1,textAlign:"left"}}>{kidName}模式</span>
-          <span style={{fontSize:12,color:"rgba(255,255,255,0.8)"}}>查看點數和寵物</span>
-          <span style={{fontSize:18}}>→</span>
-        </button>
-      </div>
-      {showPin&&(
-        <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:50,backdropFilter:"blur(4px)"}}>
-          <div style={{background:"#fff",borderRadius:24,padding:"28px 24px",width:280,textAlign:"center",animation:pinError?"shake 0.4s ease":"none"}}>
-            <div style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#333",marginBottom:4}}>🔐 輸入家長密碼</div>
-            <div style={{fontSize:12,color:"#aaa",marginBottom:16}}>（預設：1234）</div>
-            <input type="password" maxLength={4} placeholder="••••" value={pinInput} onChange={e=>setPinInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleLogin()} autoFocus style={{width:"100%",border:`2px solid ${pinError?"#f5576c":"#e0e0e0"}`,borderRadius:12,padding:12,fontSize:24,textAlign:"center",letterSpacing:8,outline:"none",fontFamily:"'Nunito',sans-serif"}}/>
-            {pinError&&<div style={{color:"#f5576c",fontSize:13,marginTop:8}}>密碼錯誤，請再試一次</div>}
-            <div style={{display:"flex",gap:10,marginTop:16}}>
-              <button onClick={()=>{setShowPin(false);setPinInput("");}} style={{flex:1,padding:12,border:"2px solid #eee",borderRadius:12,background:"none",color:"#666",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>取消</button>
-              <button onClick={handleLogin} style={{flex:1,padding:12,border:"none",borderRadius:12,background:"linear-gradient(135deg,#f093fb,#f5576c)",color:"#fff",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>確認</button>
-            </div>
-          </div>
-        </div>
-      )}
+  const stars=[[8,12],[22,6],[38,20],[55,4],[70,16],[85,8],[14,38],[30,32],[48,26],[64,40],[78,35],[92,10]];
+  return <div style={{height:"100%",background:"linear-gradient(160deg,#0f0c29,#302b63,#24243e)",display:"flex",
+    flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:28,position:"relative",overflow:"hidden"}}>
+    {stars.map(([l,t],i)=><div key={i} style={{position:"absolute",width:3+i%3,height:3+i%3,borderRadius:"50%",
+      background:"rgba(255,255,255,.5)",left:`${l}%`,top:`${t}%`,animation:`twinkle ${1.4+i*.2}s ease-in-out infinite`}}/>)}
+
+    <div style={{fontSize:64,animation:"float 3s ease-in-out infinite"}}>⭐</div>
+    <div style={{textAlign:"center"}}>
+      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:44,color:"#fff",letterSpacing:3,textShadow:"0 4px 24px rgba(255,215,0,.4)"}}>集點星球</div>
+      <div style={{fontSize:14,color:"rgba(255,255,255,.5)",marginTop:4}}>請選擇你的角色</div>
     </div>
-  );
+
+    <button onClick={()=>setShowPin(true)} style={{width:"100%",border:"none",borderRadius:28,padding:"20px 24px",
+      display:"flex",alignItems:"center",gap:16,cursor:"pointer",
+      background:"linear-gradient(135deg,#f093fb,#f5576c)",boxShadow:"0 12px 32px rgba(240,147,251,.5)"}}>
+      <div style={{width:62,height:62,borderRadius:20,background:"rgba(255,255,255,.25)",display:"flex",
+        alignItems:"center",justifyContent:"center",fontSize:32,flexShrink:0}}>👩‍👧</div>
+      <div style={{flex:1,textAlign:"left"}}>
+        <div style={{fontFamily:"'Fredoka One',cursive",fontSize:24,color:"#fff"}}>家長模式</div>
+        <div style={{fontSize:12,color:"rgba(255,255,255,.85)",marginTop:2}}>管理點數・任務・獎勵</div>
+      </div>
+      <div style={{fontSize:28}}>🔒</div>
+    </button>
+
+    <button onClick={()=>setMode("kid")} style={{width:"100%",border:"none",borderRadius:28,padding:"20px 24px",
+      display:"flex",alignItems:"center",gap:16,cursor:"pointer",
+      background:"linear-gradient(135deg,#43e97b,#38f9d7)",boxShadow:"0 12px 32px rgba(67,233,123,.45)"}}>
+      <div style={{width:62,height:62,borderRadius:20,background:"rgba(255,255,255,.25)",display:"flex",
+        alignItems:"center",justifyContent:"center",fontSize:32,flexShrink:0,overflow:"hidden"}}>
+        {avatar?<img src={avatar} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:"🧒"}
+      </div>
+      <div style={{flex:1,textAlign:"left"}}>
+        <div style={{fontFamily:"'Fredoka One',cursive",fontSize:24,color:"#fff"}}>{kidName}的模式</div>
+        <div style={{fontSize:12,color:"rgba(255,255,255,.85)",marginTop:2}}>點數・任務・寵物・存款</div>
+      </div>
+      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:28,color:"#fff"}}>→</div>
+    </button>
+
+    {showPin&&<div style={{position:"absolute",inset:0,background:"rgba(0,0,0,.75)",display:"flex",
+      alignItems:"center",justifyContent:"center",zIndex:50,backdropFilter:"blur(8px)"}}>
+      <div style={{background:"#fff",borderRadius:28,padding:"26px 22px 18px",width:300,animation:pinErr?"shake .4s ease":"none"}}>
+        <div style={{fontFamily:"'Fredoka One',cursive",fontSize:22,color:"#333",textAlign:"center"}}>🔐 家長密碼</div>
+        <div style={{fontSize:12,color:"#aaa",textAlign:"center",margin:"4px 0 2px"}}>（預設：1234）</div>
+        <NumPad val={pinInput} setVal={setPinInput} max={6} err={pinErr?"密碼錯誤，請再試一次":""} okLabel="進入"
+          onOk={login} onCancel={()=>{setShowPin(false);setPinInput("");}}/>
+      </div>
+    </div>}
+  </div>;
 }
 
-function ParentMode({points,lv,events,rewards,history,addPoints,tab,setTab,setMode,floatAnim,showAddEvent,setShowAddEvent,editingEvent,setEditingEvent,newEvent,setNewEvent,setEvents,openEditEvent,deleteEvent,showAddReward,setShowAddReward,editingReward,setEditingReward,newReward,setNewReward,setRewards,openEditReward,deleteReward,PIN,setPIN,kidName,setKidName}){
-  return(
-    <div style={{height:"100%",background:"#F8F7FF",display:"flex",flexDirection:"column",paddingTop:32}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 20px 8px"}}>
-        <div><div style={{fontFamily:"'Fredoka One',cursive",fontSize:22,color:"#333"}}>集點星球</div><div style={{fontSize:11,color:"#999"}}>家長管理介面</div></div>
-        <button onClick={()=>setMode("select")} style={{background:"#EEE",border:"none",borderRadius:20,padding:"6px 14px",fontSize:13,color:"#666",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>切換 ↩</button>
-      </div>
-      <div style={{margin:"8px 20px",background:"linear-gradient(135deg,#667eea,#764ba2)",borderRadius:20,padding:"16px 20px",display:"flex",alignItems:"center",gap:14,position:"relative"}}>
-        <div style={{fontSize:36}}>{lv.emoji}</div>
-        <div style={{flex:1}}><div style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#fff"}}>{kidName}</div><div style={{fontSize:12,color:"rgba(255,255,255,0.8)",marginTop:2}}>{lv.name} · Lv.{lv.level}</div></div>
-        <div style={{position:"relative",textAlign:"right"}}>
-          <div style={{fontFamily:"'Fredoka One',cursive",fontSize:40,color:"#FFE135",lineHeight:1}}>{points}</div>
-          <div style={{fontSize:13,color:"rgba(255,255,255,0.8)"}}>點</div>
-          {floatAnim&&<div key={floatAnim.id} style={{position:"absolute",top:-20,right:0,fontFamily:"'Fredoka One',cursive",fontSize:22,color:floatAnim.val>0?"#4ade80":"#f87171",animation:"floatUp 1.2s ease forwards",pointerEvents:"none"}}>{floatAnim.val>0?`+${floatAnim.val}`:floatAnim.val}</div>}
-        </div>
-      </div>
-      <div style={{display:"flex",margin:"12px 20px 0",background:"#eee",borderRadius:14,padding:4,gap:2}}>
-        {[["actions","快速加點"],["rewards","兌換管理"],["history","記錄"],["settings","設定"]].map(([k,l])=>(
-          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:"8px 4px",border:"none",borderRadius:10,background:tab===k?"#fff":"transparent",fontSize:12,color:tab===k?"#333":"#888",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700,boxShadow:tab===k?"0 2px 8px rgba(0,0,0,0.1)":"none",transition:"all 0.2s"}}>{l}</button>
-        ))}
-      </div>
-      <div style={{flex:1,overflowY:"auto",padding:"12px 20px 20px"}}>
-        {tab==="actions"&&(
-          <div>
-            <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>加點事件</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              {events.filter(e=>e.type==="add").map(e=>(
-                <div key={e.id} style={{position:"relative",borderRadius:14,background:"linear-gradient(135deg,#d4fc79,#96e6a1)",boxShadow:"0 4px 12px rgba(150,230,161,0.4)"}}>
-                  <button onClick={()=>addPoints(e)} style={{border:"none",borderRadius:14,padding:"12px 12px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",background:"transparent",width:"100%"}}>
-                    <span style={{fontSize:24}}>{e.emoji}</span>
-                    <span style={{fontSize:12,fontWeight:700,color:"#333",textAlign:"center"}}>{e.name}</span>
-                    <span style={{fontFamily:"'Fredoka One',cursive",fontSize:16,color:"#333"}}>+{e.points}</span>
-                  </button>
-                  <div style={{display:"flex",justifyContent:"center",gap:6,padding:"0 8px 8px"}}>
-                    <button onClick={()=>openEditEvent(e)} style={{flex:1,border:"none",borderRadius:8,background:"rgba(255,255,255,0.6)",fontSize:11,color:"#555",cursor:"pointer",padding:"4px 0",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>✏️ 編輯</button>
-                    <button onClick={()=>deleteEvent(e.id)} style={{flex:1,border:"none",borderRadius:8,background:"rgba(255,100,100,0.15)",fontSize:11,color:"#d00",cursor:"pointer",padding:"4px 0",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>🗑️ 刪除</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:8,marginTop:12}}>扣點事件</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              {events.filter(e=>e.type==="deduct").map(e=>(
-                <div key={e.id} style={{position:"relative",borderRadius:14,background:"linear-gradient(135deg,#ffecd2,#fcb69f)",boxShadow:"0 4px 12px rgba(252,182,159,0.4)"}}>
-                  <button onClick={()=>addPoints(e)} style={{border:"none",borderRadius:14,padding:"12px 12px 8px",display:"flex",flexDirection:"column",alignItems:"center",gap:4,cursor:"pointer",background:"transparent",width:"100%"}}>
-                    <span style={{fontSize:24}}>{e.emoji}</span>
-                    <span style={{fontSize:12,fontWeight:700,color:"#333",textAlign:"center"}}>{e.name}</span>
-                    <span style={{fontFamily:"'Fredoka One',cursive",fontSize:16,color:"#333"}}>{e.points}</span>
-                  </button>
-                  <div style={{display:"flex",justifyContent:"center",gap:6,padding:"0 8px 8px"}}>
-                    <button onClick={()=>openEditEvent(e)} style={{flex:1,border:"none",borderRadius:8,background:"rgba(255,255,255,0.6)",fontSize:11,color:"#555",cursor:"pointer",padding:"4px 0",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>✏️ 編輯</button>
-                    <button onClick={()=>deleteEvent(e.id)} style={{flex:1,border:"none",borderRadius:8,background:"rgba(255,100,100,0.15)",fontSize:11,color:"#d00",cursor:"pointer",padding:"4px 0",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>🗑️ 刪除</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button onClick={()=>{setEditingEvent(null);setNewEvent({name:"",points:"",emoji:"⭐",type:"add"});setShowAddEvent(true);}} style={{width:"100%",marginTop:12,padding:12,border:"2px dashed #ccc",borderRadius:14,background:"none",color:"#aaa",fontSize:14,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>＋ 新增自訂事件</button>
-          </div>
-        )}
-        {tab==="rewards"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>可兌換獎勵</div>
-            {rewards.map(r=>(
-              <div key={r.id} style={{background:"#fff",borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
-                <span style={{fontSize:24}}>{r.emoji}</span>
-                <span style={{flex:1,fontSize:14,fontWeight:700,color:"#333"}}>{r.name}</span>
-                <span style={{fontFamily:"'Fredoka One',cursive",fontSize:15,color:"#667eea",marginRight:8}}>{r.cost}點</span>
-                <button onClick={()=>openEditReward(r)} style={{border:"none",borderRadius:8,background:"#f0f0f0",fontSize:12,color:"#555",cursor:"pointer",padding:"5px 8px",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>✏️</button>
-                <button onClick={()=>deleteReward(r.id)} style={{border:"none",borderRadius:8,background:"rgba(255,100,100,0.1)",fontSize:12,color:"#d00",cursor:"pointer",padding:"5px 8px",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>🗑️</button>
-              </div>
-            ))}
-            <button onClick={()=>{setEditingReward(null);setNewReward({name:"",cost:"",emoji:"🎁"});setShowAddReward(true);}} style={{width:"100%",marginTop:4,padding:12,border:"2px dashed #ccc",borderRadius:14,background:"none",color:"#aaa",fontSize:14,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>＋ 新增獎勵</button>
-          </div>
-        )}
-        {tab==="history"&&(
-          <div style={{display:"flex",flexDirection:"column",gap:8}}>
-            {history.map(h=>(
-              <div key={h.id} style={{background:"#fff",borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"flex-start",gap:12,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
-                <span style={{fontSize:24,marginTop:2}}>{h.emoji}</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:14,fontWeight:700,color:"#333"}}>{h.event}</div>
-                  {h.message&&<div style={{fontSize:12,color:"#888",marginTop:2}}>💬 {h.message}</div>}
-                  <div style={{fontSize:11,color:"#bbb",marginTop:2}}>{h.time}</div>
-                </div>
-                <span style={{fontFamily:"'Fredoka One',cursive",fontSize:18,color:h.points>0?"#4ade80":"#f87171"}}>{h.points>0?`+${h.points}`:h.points}</span>
-              </div>
-            ))}
-          </div>
-        )}
-        {tab==="settings"&&<SettingsTab PIN={PIN} setPIN={setPIN} kidName={kidName} setKidName={setKidName}/>}
-      </div>
-      {showAddEvent&&(
-        <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",zIndex:50,backdropFilter:"blur(2px)"}}>
-          <div style={{background:"#fff",borderRadius:"28px 28px 0 0",padding:"24px 20px 36px",width:"100%",maxHeight:"85vh",overflowY:"auto"}}>
-            <div style={{fontFamily:"'Fredoka One',cursive",fontSize:22,color:"#333",marginBottom:16}}>{editingEvent?"編輯事件":"新增自訂事件"}</div>
-            <div style={{marginBottom:12}}>
-              <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>名稱</div>
-              <input placeholder="例：讀課外書" value={newEvent.name} onChange={e=>setNewEvent(n=>({...n,name:e.target.value}))} style={{width:"100%",border:"2px solid #eee",borderRadius:12,padding:11,fontSize:15,fontFamily:"'Nunito',sans-serif",outline:"none"}}/>
-            </div>
-            <div style={{marginBottom:12}}>
-              <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>類型與點數</div>
-              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <button onClick={()=>setNewEvent(n=>({...n,type:"add",points:n.points.replace("-","")}))} style={{padding:"10px 16px",border:"none",borderRadius:10,background:newEvent.type==="add"?"#d4fc79":"#eee",fontWeight:800,fontSize:14,cursor:"pointer",color:"#333",fontFamily:"'Nunito',sans-serif"}}>＋ 加點</button>
-                <button onClick={()=>setNewEvent(n=>({...n,type:"deduct",points:n.points.replace("-","")}))} style={{padding:"10px 16px",border:"none",borderRadius:10,background:newEvent.type==="deduct"?"#fcb69f":"#eee",fontWeight:800,fontSize:14,cursor:"pointer",color:"#333",fontFamily:"'Nunito',sans-serif"}}>－ 扣點</button>
-                <input inputMode="numeric" pattern="[0-9]*" placeholder="點數" value={newEvent.points} onChange={e=>setNewEvent(n=>({...n,points:e.target.value.replace(/[^0-9]/g,"")}))} style={{flex:1,border:"2px solid #eee",borderRadius:12,padding:11,fontSize:18,fontFamily:"'Fredoka One',cursive",outline:"none",textAlign:"center"}}/>
-              </div>
-            </div>
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>圖示 <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:"#bbb"}}>（點選或輸入）</span></div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
-                {["📚","✏️","🎒","🏃","🧹","🍳","🛁","⏰","🎹","🎨","🏅","⭐","😊","💪","🌟","🎯","📖","🧩","🏆","🚀","😅","🙅","😤","📱","🎮","🍭","🛏️","💤","🗣️","😠"].map(e=>(
-                  <button key={e} onClick={()=>setNewEvent(n=>({...n,emoji:e}))} style={{width:38,height:38,border:`2px solid ${newEvent.emoji===e?"#764ba2":"transparent"}`,borderRadius:10,background:newEvent.emoji===e?"#f0ebff":"#f5f5f5",fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{e}</button>
-                ))}
-              </div>
-              <input placeholder="或直接貼上 emoji" value={newEvent.emoji} onChange={e=>setNewEvent(n=>({...n,emoji:e.target.value}))} style={{width:"100%",border:"2px solid #eee",borderRadius:12,padding:10,fontSize:20,fontFamily:"'Nunito',sans-serif",outline:"none",textAlign:"center"}}/>
-            </div>
-            <div style={{display:"flex",gap:10}}>
-              <button onClick={()=>{setShowAddEvent(false);setEditingEvent(null);setNewEvent({name:"",points:"",emoji:"⭐",type:"add"});}} style={{flex:1,padding:13,border:"2px solid #eee",borderRadius:14,background:"none",color:"#666",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>取消</button>
-              <button onClick={()=>{
-                if(!newEvent.name||!newEvent.points)return;
-                const abs=parseInt(newEvent.points);
-                const pts=newEvent.type==="deduct"?-abs:abs;
-                if(editingEvent){
-                  setEvents(ev=>ev.map(e=>e.id===editingEvent.id?{...e,name:newEvent.name,points:pts,emoji:newEvent.emoji||"⭐",type:newEvent.type}:e));
-                } else {
-                  setEvents(ev=>[...ev,{id:Date.now(),name:newEvent.name,points:pts,emoji:newEvent.emoji||"⭐",type:newEvent.type}]);
-                }
-                setNewEvent({name:"",points:"",emoji:"⭐",type:"add"});
-                setEditingEvent(null);
-                setShowAddEvent(false);
-              }} style={{flex:1,padding:13,border:"none",borderRadius:14,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>{editingEvent?"儲存":"新增"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {showAddReward&&(
-        <div style={{position:"absolute",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-end",zIndex:50,backdropFilter:"blur(2px)"}}>
-          <div style={{background:"#fff",borderRadius:"28px 28px 0 0",padding:"24px 20px 36px",width:"100%",maxHeight:"85vh",overflowY:"auto"}}>
-            <div style={{fontFamily:"'Fredoka One',cursive",fontSize:22,color:"#333",marginBottom:16}}>{editingReward?"編輯獎勵":"新增獎勵"}</div>
-            <div style={{marginBottom:12}}>
-              <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>名稱</div>
-              <input placeholder="例：買一本漫畫" value={newReward.name} onChange={e=>setNewReward(n=>({...n,name:e.target.value}))} style={{width:"100%",border:"2px solid #eee",borderRadius:12,padding:11,fontSize:15,fontFamily:"'Nunito',sans-serif",outline:"none"}}/>
-            </div>
-            <div style={{marginBottom:12}}>
-              <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:6}}>所需點數</div>
-              <input inputMode="numeric" pattern="[0-9]*" placeholder="例：30" value={newReward.cost} onChange={e=>setNewReward(n=>({...n,cost:e.target.value.replace(/[^0-9]/g,"")}))} style={{width:"100%",border:"2px solid #eee",borderRadius:12,padding:11,fontSize:20,fontFamily:"'Fredoka One',cursive",outline:"none",textAlign:"center"}}/>
-            </div>
-            <div style={{marginBottom:16}}>
-              <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>圖示 <span style={{fontWeight:400,textTransform:"none",letterSpacing:0,color:"#bbb"}}>（點選或輸入）</span></div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
-                {["🎁","🍭","🍕","🍦","🎮","📱","🎬","🏖️","🎠","🛍️","📚","🎨","🎭","🚀","🏆","⭐","🌈","🎪","🎡","🎢","🍰","🎂","🧁","🍩","🎵","🎸","🎤","🏀","⚽","🎯"].map(e=>(
-                  <button key={e} onClick={()=>setNewReward(n=>({...n,emoji:e}))} style={{width:38,height:38,border:`2px solid ${newReward.emoji===e?"#764ba2":"transparent"}`,borderRadius:10,background:newReward.emoji===e?"#f0ebff":"#f5f5f5",fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{e}</button>
-                ))}
-              </div>
-              <input placeholder="或直接貼上 emoji" value={newReward.emoji} onChange={e=>setNewReward(n=>({...n,emoji:e.target.value}))} style={{width:"100%",border:"2px solid #eee",borderRadius:12,padding:10,fontSize:20,fontFamily:"'Nunito',sans-serif",outline:"none",textAlign:"center"}}/>
-            </div>
-            <div style={{display:"flex",gap:10}}>
-              <button onClick={()=>{setShowAddReward(false);setEditingReward(null);setNewReward({name:"",cost:"",emoji:"🎁"});}} style={{flex:1,padding:13,border:"2px solid #eee",borderRadius:14,background:"none",color:"#666",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>取消</button>
-              <button onClick={()=>{
-                if(!newReward.name||!newReward.cost)return;
-                const cost=parseInt(newReward.cost);
-                if(editingReward){
-                  setRewards(rv=>rv.map(r=>r.id===editingReward.id?{...r,name:newReward.name,cost,emoji:newReward.emoji||"🎁"}:r));
-                } else {
-                  setRewards(rv=>[...rv,{id:Date.now(),name:newReward.name,cost,emoji:newReward.emoji||"🎁"}]);
-                }
-                setNewReward({name:"",cost:"",emoji:"🎁"});
-                setEditingReward(null);
-                setShowAddReward(false);
-              }} style={{flex:1,padding:13,border:"none",borderRadius:14,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>{editingReward?"儲存":"新增"}</button>
-            </div>
-          </div>
-        </div>
-      )}
+/* ═══════════════════════════════════════════════ PARENT ═══ */
+function ParentScreen(p){
+  const {pts,lv,tab,setTab,setMode,floatAnim,tasks,avatar,kidName}=p;
+  const pc=tasks.filter(t=>t.status==="reported").length;
+  const tabs=[["actions","⚡加點"],["tasks","📋任務"+(pc?`(${pc})`:"")],["rewards","🎁獎勵"],["history","📝記錄"],["settings","⚙️設定"]];
+  return <div style={{height:"100%",background:"#F8F7FF",display:"flex",flexDirection:"column",paddingTop:32}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 18px 6px"}}>
+      <div><div style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#333"}}>集點星球</div>
+        <div style={{fontSize:11,color:"#999"}}>家長管理介面</div></div>
+      <button onClick={()=>setMode("select")} style={{background:"linear-gradient(135deg,#667eea,#764ba2)",
+        border:"none",borderRadius:20,padding:"5px 14px",fontSize:12,color:"#fff",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>切換 ↩</button>
     </div>
-  );
+    <div style={{margin:"5px 18px",background:"linear-gradient(135deg,#667eea,#764ba2)",borderRadius:18,padding:"12px 16px",
+      display:"flex",alignItems:"center",gap:12,position:"relative"}}>
+      <div style={{width:48,height:48,borderRadius:14,overflow:"hidden",background:"rgba(255,255,255,.2)",
+        display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>
+        {avatar?<img src={avatar} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:lv.emoji}
+      </div>
+      <div style={{flex:1}}>
+        <div style={{fontFamily:"'Fredoka One',cursive",fontSize:17,color:"#fff"}}>{kidName}</div>
+        <div style={{fontSize:11,color:"rgba(255,255,255,.8)"}}>{lv.name} · Lv.{lv.level}</div>
+      </div>
+      <div style={{position:"relative",textAlign:"right"}}>
+        <div style={{fontFamily:"'Fredoka One',cursive",fontSize:36,color:"#FFD700",lineHeight:1}}>{pts}</div>
+        <div style={{fontSize:11,color:"rgba(255,255,255,.8)"}}>點</div>
+        {floatAnim&&<div key={floatAnim.id} style={{position:"absolute",top:-16,right:0,
+          fontFamily:"'Fredoka One',cursive",fontSize:20,color:floatAnim.val>0?"#4ade80":"#f87171",
+          animation:"floatUp 1.3s ease forwards",pointerEvents:"none"}}>{floatAnim.val>0?`+${floatAnim.val}`:floatAnim.val}</div>}
+      </div>
+    </div>
+    <div style={{display:"flex",margin:"7px 18px 0",background:"#eee",borderRadius:12,padding:3,gap:2}}>
+      {tabs.map(([k,l])=><button key={k} onClick={()=>setTab(k)} style={{flex:1,minWidth:0,padding:"6px 1px",
+        border:"none",borderRadius:9,background:tab===k?"#fff":"transparent",fontSize:10,
+        color:tab===k?"#333":"#888",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700,
+        whiteSpace:"nowrap",boxShadow:tab===k?"0 2px 5px rgba(0,0,0,.1)":"none",transition:"all .2s"}}>{l}</button>)}
+    </div>
+    <div style={{flex:1,overflowY:"auto",padding:"9px 18px 22px"}}>
+      {tab==="actions" &&<ActionsTab {...p}/>}
+      {tab==="tasks"   &&<PTasksTab  {...p}/>}
+      {tab==="rewards" &&<RewardsTab {...p}/>}
+      {tab==="history" &&<HistTab    {...p}/>}
+      {tab==="settings"&&<SettingsTab {...p}/>}
+    </div>
+    {p.evModal   &&<EventModal   {...p}/>}
+    {p.rwModal   &&<RewardModal  {...p}/>}
+    {p.taskModal &&<TaskModal    {...p}/>}
+  </div>;
 }
 
-
-function PinDots({val,maxLen=4}){
-  return (
-    <div style={{display:"flex",gap:12,justifyContent:"center",margin:"16px 0"}}>
-      {Array.from({length:maxLen}).map((_,i)=>(
-        <div key={i} style={{width:16,height:16,borderRadius:"50%",background:i<val.length?"#764ba2":"#eee",transition:"background 0.15s"}}/>
-      ))}
-    </div>
-  );
-}
-function NumPad({val,setVal,maxLen=4,onConfirm,onCancel,err,confirmLabel="確認"}){
-  const keys=["1","2","3","4","5","6","7","8","9","","0","⌫"];
-  return (
-    <div>
-      <PinDots val={val} maxLen={maxLen}/>
-      {err&&<div style={{color:"#f5576c",fontSize:13,textAlign:"center",marginBottom:8}}>{err}</div>}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,margin:"8px 0 16px"}}>
-        {keys.map((k,i)=>(
-          k===""?<div key={i}/>:
-          <button key={i} onClick={()=>{
-            if(k==="⌫"){setVal(v=>v.slice(0,-1));}
-            else if(val.length<maxLen){setVal(v=>v+k);}
-          }} style={{padding:"14px 0",border:"2px solid #eee",borderRadius:14,background:k==="⌫"?"#fff5f5":"#fff",fontSize:k==="⌫"?20:22,fontWeight:700,cursor:"pointer",color:k==="⌫"?"#f87171":"#333",fontFamily:"'Nunito',sans-serif"}}>
-            {k}
+function ActionsTab({events,setEvents,addPts,setEvModal,setEditEv,setNewEv}){
+  const openEdit=ev=>{setEditEv(ev);setNewEv({name:ev.name,pts:String(Math.abs(ev.pts)),emoji:ev.emoji,type:ev.type});setEvModal(true);};
+  return <div>
+    {["add","deduct"].map(type=><div key={type}>
+      <div style={{fontSize:11,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,
+        marginBottom:7,marginTop:type==="deduct"?13:0}}>{type==="add"?"加點事件":"扣點事件"}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
+        {events.filter(e=>e.type===type).map(e=><div key={e.id} style={{borderRadius:13,
+          background:type==="add"?"linear-gradient(135deg,#d4fc79,#96e6a1)":"linear-gradient(135deg,#ffecd2,#fcb69f)",
+          boxShadow:`0 4px 10px ${type==="add"?"rgba(150,230,161,.4)":"rgba(252,182,159,.4)"}`}}>
+          <button onClick={()=>addPts(e)} style={{border:"none",borderRadius:"13px 13px 0 0",padding:"11px 6px 5px",
+            display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",background:"transparent",width:"100%"}}>
+            <span style={{fontSize:22}}>{e.emoji}</span>
+            <span style={{fontSize:11,fontWeight:700,color:"#333",textAlign:"center"}}>{e.name}</span>
+            <span style={{fontFamily:"'Fredoka One',cursive",fontSize:14,color:"#333"}}>{e.pts>0?`+${e.pts}`:e.pts}</span>
           </button>
-        ))}
+          <div style={{display:"flex",gap:3,padding:"3px 5px 7px"}}>
+            <button onClick={()=>openEdit(e)} style={{flex:1,border:"none",borderRadius:7,background:"rgba(255,255,255,.6)",
+              fontSize:10,color:"#555",cursor:"pointer",padding:"3px 0",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>✏️編輯</button>
+            <button onClick={()=>setEvents(ev=>ev.filter(x=>x.id!==e.id))} style={{flex:1,border:"none",borderRadius:7,
+              background:"rgba(255,100,100,.15)",fontSize:10,color:"#d00",cursor:"pointer",padding:"3px 0",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>🗑️刪除</button>
+          </div>
+        </div>)}
       </div>
-      <div style={{display:"flex",gap:10}}>
-        <button onClick={onCancel} style={{flex:1,padding:14,border:"2px solid #eee",borderRadius:14,background:"none",color:"#666",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>取消</button>
-        <button onClick={onConfirm} style={{flex:1,padding:14,border:"none",borderRadius:14,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>{confirmLabel}</button>
-      </div>
-    </div>
-  );
+    </div>)}
+    <button onClick={()=>{setEditEv(null);setNewEv({name:"",pts:"",emoji:"⭐",type:"add"});setEvModal(true);}}
+      style={{width:"100%",marginTop:12,padding:11,border:"2px dashed #ccc",borderRadius:13,background:"none",
+        color:"#aaa",fontSize:13,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>＋ 新增自訂事件</button>
+  </div>;
 }
-function SettingsTab({PIN,setPIN,kidName,setKidName}){
+
+function PTasksTab({tasks,setTasks,confirmTask,setTaskModal,setNewTask}){
+  const rep=tasks.filter(t=>t.status==="reported");
+  const pen=tasks.filter(t=>t.status==="pending");
+  const don=tasks.filter(t=>t.status==="done").slice(0,4);
+  const row={background:"#fff",borderRadius:13,padding:"10px 13px",marginBottom:7,boxShadow:"0 2px 7px rgba(0,0,0,.06)"};
+  return <div>
+    {rep.length>0&&<><div style={{fontSize:11,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:7}}>⏳ 待確認（{rep.length}）</div>
+      {rep.map(t=><div key={t.id} style={{...row,border:"2px solid #667eea"}}>
+        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:9}}>
+          <span style={{fontSize:22}}>{t.emoji}</span>
+          <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:"#333"}}>{t.name}</div>
+            <div style={{fontSize:11,color:"#888"}}>孩子回報完成・可得 +{t.pts} 點</div></div>
+        </div>
+        <div style={{display:"flex",gap:7}}>
+          <button onClick={()=>setTasks(ts=>ts.map(x=>x.id===t.id?{...x,status:"pending"}:x))}
+            style={{flex:1,padding:"7px 0",border:"2px solid #eee",borderRadius:9,background:"#fff",color:"#888",fontSize:12,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>❌ 退回</button>
+          <button onClick={()=>confirmTask(t.id)}
+            style={{flex:1,padding:"7px 0",border:"none",borderRadius:9,background:"linear-gradient(135deg,#d4fc79,#96e6a1)",color:"#333",fontSize:12,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>✅ 確認給點</button>
+        </div>
+      </div>)}
+    </>}
+    {pen.length>0&&<><div style={{fontSize:11,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:7,marginTop:rep.length?12:0}}>📋 進行中</div>
+      {pen.map(t=><div key={t.id} style={{...row,display:"flex",alignItems:"center",gap:9}}>
+        <span style={{fontSize:20}}>{t.emoji}</span>
+        <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:"#333"}}>{t.name}</div>
+          <div style={{fontSize:10,color:"#aaa"}}>完成可得 +{t.pts} 點</div></div>
+        <button onClick={()=>setTasks(ts=>ts.filter(x=>x.id!==t.id))}
+          style={{border:"none",background:"#f5f5f5",borderRadius:7,padding:"3px 8px",fontSize:10,color:"#aaa",cursor:"pointer",fontFamily:"'Nunito',sans-serif"}}>移除</button>
+      </div>)}
+    </>}
+    {don.length>0&&<><div style={{fontSize:11,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:7,marginTop:12}}>✅ 已完成</div>
+      {don.map(t=><div key={t.id} style={{...row,display:"flex",alignItems:"center",gap:9,opacity:.6}}>
+        <span style={{fontSize:18}}>{t.emoji}</span>
+        <div style={{flex:1,fontSize:12,color:"#666"}}>{t.name}</div>
+        <div style={{fontSize:11,color:"#4ade80",fontWeight:700}}>+{t.pts} ✓</div>
+      </div>)}
+    </>}
+    <button onClick={()=>{setNewTask({name:"",pts:"",emoji:"📋"});setTaskModal(true);}}
+      style={{width:"100%",marginTop:12,padding:11,border:"2px dashed #ccc",borderRadius:13,background:"none",
+        color:"#aaa",fontSize:13,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>＋ 指派新任務</button>
+  </div>;
+}
+
+function RewardsTab({rewards,setRewards,setRwModal,setEditRw,setNewRw}){
+  const openEdit=r=>{setEditRw(r);setNewRw({name:r.name,cost:String(r.cost),emoji:r.emoji});setRwModal(true);};
+  return <div style={{display:"flex",flexDirection:"column",gap:7}}>
+    {rewards.map(r=><div key={r.id} style={{background:"#fff",borderRadius:13,padding:"11px 14px",display:"flex",alignItems:"center",gap:10,boxShadow:"0 2px 7px rgba(0,0,0,.06)"}}>
+      <span style={{fontSize:22}}>{r.emoji}</span>
+      <span style={{flex:1,fontSize:13,fontWeight:700,color:"#333"}}>{r.name}</span>
+      <span style={{fontFamily:"'Fredoka One',cursive",fontSize:14,color:"#667eea",marginRight:5}}>{r.cost}點</span>
+      <button onClick={()=>openEdit(r)} style={{border:"none",borderRadius:7,background:"#f0f0f0",fontSize:12,cursor:"pointer",padding:"4px 7px"}}>✏️</button>
+      <button onClick={()=>setRewards(rv=>rv.filter(x=>x.id!==r.id))} style={{border:"none",borderRadius:7,background:"rgba(255,100,100,.1)",fontSize:12,color:"#d00",cursor:"pointer",padding:"4px 7px"}}>🗑️</button>
+    </div>)}
+    <button onClick={()=>{setEditRw(null);setNewRw({name:"",cost:"",emoji:"🎁"});setRwModal(true);}}
+      style={{width:"100%",marginTop:3,padding:11,border:"2px dashed #ccc",borderRadius:13,background:"none",
+        color:"#aaa",fontSize:13,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>＋ 新增獎勵</button>
+  </div>;
+}
+
+function HistTab({hist,setHist,setPts}){
+  return <div style={{display:"flex",flexDirection:"column",gap:7}}>
+    {hist.map(h=><div key={h.id} style={{background:"#fff",borderRadius:13,padding:"11px 14px",display:"flex",alignItems:"flex-start",gap:10,boxShadow:"0 2px 7px rgba(0,0,0,.06)"}}>
+      <span style={{fontSize:20,marginTop:2}}>{h.emoji}</span>
+      <div style={{flex:1}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#333"}}>{h.event}</div>
+        {h.msg&&<div style={{fontSize:11,color:"#888",marginTop:1}}>💬 {h.msg}</div>}
+        <div style={{fontSize:10,color:"#bbb",marginTop:1}}>{h.time}</div>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3}}>
+        <span style={{fontFamily:"'Fredoka One',cursive",fontSize:16,color:h.pts>0?"#4ade80":"#f87171"}}>{h.pts>0?`+${h.pts}`:h.pts}</span>
+        {h.type==="redeem"&&h.time==="剛剛"&&<button onClick={()=>{setHist(hs=>hs.filter(x=>x.id!==h.id));setPts(p=>p+Math.abs(h.pts));}}
+          style={{border:"none",borderRadius:7,background:"#fff0f0",color:"#f87171",fontSize:9,cursor:"pointer",padding:"2px 7px",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>取消兌換</button>}
+      </div>
+    </div>)}
+  </div>;
+}
+
+function SettingsTab({PIN,setPIN,kidName,setKidName,avatar,setAvatar,savings,mature}){
   const [step,setStep]=useState("menu");
-  const [oldPin,setOldPin]=useState("");
-  const [newPin,setNewPin]=useState("");
-  const [confirmPin,setConfirmPin]=useState("");
-  const [err,setErr]=useState("");
-  const [nameInput,setNameInput]=useState(kidName);
-  const labelStyle={fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:8,display:"block"};
+  const [op,setOp]=useState(""); const [np,setNp]=useState(""); const [cp,setCp]=useState("");
+  const [err,setErr]=useState(""); const [ni,setNi]=useState(kidName);
+  const fileRef=useRef();
+  const card={background:"#fff",borderRadius:14,padding:"14px 16px",boxShadow:"0 2px 7px rgba(0,0,0,.06)",marginBottom:9};
 
-  if(step==="menu") return (
-    <div style={{display:"flex",flexDirection:"column",gap:12}}>
-      <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>一般設定</div>
-      <div style={{background:"#fff",borderRadius:16,padding:"18px 20px",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
-        <div style={{fontSize:13,color:"#999",marginBottom:4}}>孩子名稱</div>
-        <div style={{fontSize:18,fontWeight:800,color:"#333"}}>{kidName}</div>
-        <button onClick={()=>{setNameInput(kidName);setStep("changeName");}} style={{marginTop:10,border:"none",borderRadius:10,background:"#f0ebff",color:"#764ba2",fontSize:13,fontWeight:700,padding:"6px 14px",cursor:"pointer",fontFamily:"'Nunito',sans-serif"}}>✏️ 修改名稱</button>
+  if(step==="menu")return <div>
+    <div style={{fontSize:11,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:7}}>一般設定</div>
+    <div style={card}>
+      <div style={{fontSize:11,color:"#999",marginBottom:7}}>孩子頭像</div>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <div onClick={()=>fileRef.current.click()} style={{width:52,height:52,borderRadius:16,overflow:"hidden",
+          background:"#f0ebff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,cursor:"pointer",flexShrink:0}}>
+          {avatar?<img src={avatar} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:"🧒"}
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          <button onClick={()=>fileRef.current.click()} style={{border:"none",borderRadius:9,background:"#f0ebff",color:"#764ba2",fontSize:12,fontWeight:700,padding:"5px 12px",cursor:"pointer",fontFamily:"'Nunito',sans-serif"}}>📷 上傳頭像</button>
+          {avatar&&<button onClick={()=>setAvatar(null)} style={{border:"none",borderRadius:9,background:"#fff0f0",color:"#f87171",fontSize:11,fontWeight:700,padding:"4px 10px",cursor:"pointer",fontFamily:"'Nunito',sans-serif"}}>移除</button>}
+        </div>
       </div>
-      <div style={{fontSize:12,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginTop:4,marginBottom:4}}>安全設定</div>
-      <div style={{background:"#fff",borderRadius:16,padding:"18px 20px",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
-        <div style={{fontSize:13,color:"#999",marginBottom:4}}>家長密碼</div>
-        <div style={{fontSize:22,fontWeight:800,color:"#333",letterSpacing:8}}>{"●".repeat(PIN.length)}</div>
-        <button onClick={()=>{setOldPin("");setErr("");setStep("verifyOld");}} style={{marginTop:10,border:"none",borderRadius:10,background:"#f0ebff",color:"#764ba2",fontSize:13,fontWeight:700,padding:"6px 14px",cursor:"pointer",fontFamily:"'Nunito',sans-serif"}}>🔑 變更密碼</button>
-      </div>
+      <input ref={fileRef} type="file" accept="image/*" onChange={e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>setAvatar(ev.target.result);r.readAsDataURL(f);}} style={{display:"none"}}/>
     </div>
-  );
+    <div style={card}>
+      <div style={{fontSize:11,color:"#999",marginBottom:2}}>孩子名稱</div>
+      <div style={{fontSize:15,fontWeight:800,color:"#333"}}>{kidName}</div>
+      <button onClick={()=>{setNi(kidName);setStep("name");}} style={{marginTop:7,border:"none",borderRadius:9,background:"#f0ebff",color:"#764ba2",fontSize:12,fontWeight:700,padding:"5px 12px",cursor:"pointer",fontFamily:"'Nunito',sans-serif"}}>✏️ 修改名稱</button>
+    </div>
+    <div style={{fontSize:11,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:7,marginTop:3}}>安全設定</div>
+    <div style={card}>
+      <div style={{fontSize:11,color:"#999",marginBottom:2}}>家長密碼</div>
+      <div style={{fontSize:20,fontWeight:800,color:"#333",letterSpacing:7}}>{"●".repeat(PIN.length)}</div>
+      <button onClick={()=>{setOp("");setErr("");setStep("verifyOld");}} style={{marginTop:7,border:"none",borderRadius:9,background:"#f0ebff",color:"#764ba2",fontSize:12,fontWeight:700,padding:"5px 12px",cursor:"pointer",fontFamily:"'Nunito',sans-serif"}}>🔑 變更密碼</button>
+    </div>
+    {savings.length>0&&<><div style={{fontSize:11,fontWeight:800,color:"#888",textTransform:"uppercase",letterSpacing:1,marginBottom:7,marginTop:3}}>🐷 小豬撲滿</div>
+      {savings.map(d=>{const ret=Math.round(d.amount*(1+d.rate));const dp=Math.floor((Date.now()-d.depositDate)/(86400000));const m=dp>=d.days;
+        return <div key={d.id} style={card}>
+          <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:m?7:0}}>
+            <span style={{fontSize:20}}>💰</span>
+            <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700,color:"#333"}}>{d.amount}點・存{d.days}天</div>
+              <div style={{fontSize:10,color:"#aaa"}}>到期領回 {ret} 點</div></div>
+            {m&&<span style={{background:"#FFD700",color:"#333",fontSize:9,fontWeight:800,padding:"2px 6px",borderRadius:6}}>到期</span>}
+          </div>
+          {m&&<button onClick={()=>mature(d.id)} style={{width:"100%",padding:"7px 0",border:"none",borderRadius:9,
+            background:"linear-gradient(135deg,#f6d365,#fda085)",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'Nunito',sans-serif"}}>🐷 發放 {ret} 點給孩子</button>}
+        </div>;
+      })}
+    </>}
+  </div>;
 
-  if(step==="changeName") return (
-    <div style={{background:"#fff",borderRadius:16,padding:"20px",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
-      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:18,color:"#333",marginBottom:16}}>修改孩子名稱</div>
-      <span style={labelStyle}>顯示名稱</span>
-      <input value={nameInput} onChange={e=>setNameInput(e.target.value)} placeholder="輸入新名稱" style={{width:"100%",border:"2px solid #eee",borderRadius:12,padding:12,fontSize:18,fontFamily:"'Nunito',sans-serif",outline:"none",textAlign:"center"}}/>
-      <div style={{display:"flex",gap:10,marginTop:16}}>
-        <button onClick={()=>setStep("menu")} style={{flex:1,padding:13,border:"2px solid #eee",borderRadius:12,background:"none",color:"#666",fontSize:14,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>取消</button>
-        <button onClick={()=>{if(nameInput.trim()){setKidName(nameInput.trim());setStep("menu");}}} style={{flex:1,padding:13,border:"none",borderRadius:12,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",fontSize:14,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700}}>儲存</button>
-      </div>
-    </div>
-  );
+  if(step==="name")return <div style={card}>
+    <MTtl c="修改孩子名稱"/>
+    <input value={ni} onChange={e=>setNi(e.target.value)} placeholder="輸入新名稱"
+      style={{width:"100%",border:"2px solid #eee",borderRadius:12,padding:11,fontSize:17,outline:"none",textAlign:"center",fontFamily:"'Nunito',sans-serif"}}/>
+    <MBtns onCancel={()=>setStep("menu")} onOk={()=>{if(ni.trim()){setKidName(ni.trim());setStep("menu");}}} okLabel="儲存"/>
+  </div>;
 
-  if(step==="verifyOld") return (
-    <div style={{background:"#fff",borderRadius:16,padding:"20px",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
-      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:18,color:"#333",marginBottom:4}}>🔐 輸入目前密碼</div>
-      <div style={{fontSize:12,color:"#aaa",marginBottom:4}}>請輸入現在的家長密碼</div>
-      <NumPad val={oldPin} setVal={setOldPin} maxLen={PIN.length>4?PIN.length:6} err={err} confirmLabel="下一步"
-        onConfirm={()=>{if(oldPin===PIN){setErr("");setNewPin("");setConfirmPin("");setStep("setNew");}else{setErr("密碼錯誤，請再試一次");setOldPin("");}}}
-        onCancel={()=>{setStep("menu");setOldPin("");setErr("");}}/>
-    </div>
-  );
+  if(step==="verifyOld")return <div style={card}>
+    <MTtl c="🔐 輸入目前密碼"/>
+    <NumPad val={op} setVal={setOp} max={6} err={err} okLabel="下一步"
+      onOk={()=>{if(op===PIN){setErr("");setNp("");setCp("");setStep("setNew");}else{setErr("密碼錯誤");setOp("");}}}
+      onCancel={()=>{setStep("menu");setOp("");setErr("");}}/>
+  </div>;
 
-  if(step==="setNew") return (
-    <div style={{background:"#fff",borderRadius:16,padding:"20px",boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
-      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:18,color:"#333",marginBottom:4}}>
-        {confirmPin.length===0&&newPin.length<4?"設定新密碼":"確認新密碼"}
-      </div>
-      <div style={{fontSize:12,color:"#aaa",marginBottom:4}}>
-        {newPin.length<4?"請輸入4位新密碼":"請再輸入一次確認"}
-      </div>
-      {newPin.length<4
-        ? <NumPad val={newPin} setVal={setNewPin} err={err} confirmLabel="下一步"
-            onConfirm={()=>{if(newPin.length<4){setErr("至少需要4位數");}else{setErr("");}}}
-            onCancel={()=>{setStep("menu");setNewPin("");setErr("");}}/>
-        : <NumPad val={confirmPin} setVal={setConfirmPin} err={err} confirmLabel="儲存密碼"
-            onConfirm={()=>{
-              if(confirmPin!==newPin){setErr("兩次密碼不一致");setConfirmPin("");}
-              else{setPIN(newPin);setStep("done");}
-            }}
-            onCancel={()=>{setNewPin("");setConfirmPin("");setErr("");}}/>
-      }
-    </div>
-  );
+  if(step==="setNew")return <div style={card}>
+    <MTtl c={np.length<4?"設定新密碼（4-6位）":"確認新密碼"}/>
+    {np.length<4
+      ?<NumPad val={np} setVal={setNp} err={err} okLabel="下一步" onOk={()=>np.length<4&&setErr("至少4位數")} onCancel={()=>{setStep("menu");setNp("");}}/>
+      :<NumPad val={cp} setVal={setCp} err={err} okLabel="儲存密碼"
+          onOk={()=>cp===np?(setPIN(np),setStep("done")):(setErr("兩次不一致"),setCp(""))}
+          onCancel={()=>{setNp("");setCp("");setErr("");}}/>}
+  </div>;
 
-  if(step==="done") return (
-    <div style={{background:"#fff",borderRadius:16,padding:"32px 20px",boxShadow:"0 2px 8px rgba(0,0,0,0.06)",textAlign:"center"}}>
-      <div style={{fontSize:56}}>✅</div>
-      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:22,color:"#333",marginTop:12}}>密碼已更新！</div>
-      <div style={{fontSize:13,color:"#999",marginTop:8}}>新密碼已生效，下次進入家長模式時使用新密碼。</div>
-      <button onClick={()=>setStep("menu")} style={{width:"100%",padding:14,border:"none",borderRadius:14,background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",fontSize:15,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700,marginTop:24}}>返回設定</button>
-    </div>
-  );
+  return <div style={{...card,textAlign:"center",padding:"28px 16px"}}>
+    <div style={{fontSize:48}}>✅</div>
+    <div style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#333",marginTop:9}}>密碼已更新！</div>
+    <div style={{fontSize:11,color:"#999",marginTop:5}}>新密碼下次登入時生效</div>
+    <button onClick={()=>setStep("menu")} style={{width:"100%",padding:12,border:"none",borderRadius:13,
+      background:"linear-gradient(135deg,#667eea,#764ba2)",color:"#fff",fontSize:14,cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700,marginTop:18}}>返回設定</button>
+  </div>;
 }
 
-function KidMode({points,lv,nextLv,progress,rewards,history,redeem,tab,setTab,setMode,redeemMsg,levelUpAnim,kidName}){
-  return(
-    <div style={{height:"100%",background:"linear-gradient(180deg,#0f0c29 0%,#302b63 50%,#24243e 100%)",display:"flex",flexDirection:"column",paddingTop:32,overflow:"hidden"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 20px 8px"}}>
-        <div style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#fff"}}>✨ {kidName}的星球</div>
-        <button onClick={()=>setMode("select")} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:20,padding:"6px 14px",fontSize:13,color:"#fff",cursor:"pointer"}}>↩</button>
+/* ── parent modals ── */
+function EventModal({editEv,setEditEv,newEv,setNewEv,events,setEvents,setEvModal}){
+  const close=()=>{setEvModal(false);setEditEv(null);setNewEv({name:"",pts:"",emoji:"⭐",type:"add"});};
+  const save=()=>{
+    if(!newEv.name||!newEv.pts)return;
+    const pts=newEv.type==="deduct"?-parseInt(newEv.pts):parseInt(newEv.pts);
+    editEv?setEvents(ev=>ev.map(e=>e.id===editEv.id?{...e,name:newEv.name,pts,emoji:newEv.emoji,type:newEv.type}:e))
+          :setEvents(ev=>[...ev,{id:Date.now(),name:newEv.name,pts,emoji:newEv.emoji,type:newEv.type}]);
+    close();
+  };
+  return <ModalWrap onClose={close}>
+    <MTtl c={editEv?"編輯事件":"新增事件"}/>
+    <FI label="名稱" ph="例：讀課外書" value={newEv.name} onChange={e=>setNewEv(n=>({...n,name:e.target.value}))}/>
+    <div style={{marginBottom:12}}>
+      <FL c="類型與點數"/>
+      <div style={{display:"flex",gap:7,alignItems:"center"}}>
+        <button onClick={()=>setNewEv(n=>({...n,type:"add"}))} style={{padding:"9px 13px",border:"none",borderRadius:9,
+          background:newEv.type==="add"?"#d4fc79":"#eee",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:"'Nunito',sans-serif"}}>＋ 加點</button>
+        <button onClick={()=>setNewEv(n=>({...n,type:"deduct"}))} style={{padding:"9px 13px",border:"none",borderRadius:9,
+          background:newEv.type==="deduct"?"#fcb69f":"#eee",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:"'Nunito',sans-serif"}}>－ 扣點</button>
+        <input inputMode="numeric" placeholder="點數" value={newEv.pts}
+          onChange={e=>setNewEv(n=>({...n,pts:e.target.value.replace(/[^0-9]/g,"")}))}
+          style={{flex:1,border:"2px solid #eee",borderRadius:12,padding:9,fontSize:20,fontFamily:"'Fredoka One',cursive",outline:"none",textAlign:"center"}}/>
       </div>
-      <div style={{display:"flex",margin:"0 20px 12px",background:"rgba(255,255,255,0.1)",borderRadius:14,padding:4,gap:2}}>
-        {[["home","我的星球"],["shop","兌換商城"],["log","獲得記錄"]].map(([k,l])=>(
-          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:"8px 4px",border:"none",borderRadius:10,background:tab===k?"rgba(255,255,255,0.2)":"transparent",fontSize:11,color:tab===k?"#fff":"rgba(255,255,255,0.6)",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700,transition:"all 0.2s"}}>{l}</button>
-        ))}
-      </div>
-      {tab==="home"&&(
-        <div style={{flex:1,overflowY:"auto",padding:"0 20px 20px",display:"flex",flexDirection:"column",gap:14}}>
-          <div style={{borderRadius:24,padding:24,display:"flex",flexDirection:"column",alignItems:"center",gap:8,position:"relative",overflow:"hidden",background:lv.bg,animation:levelUpAnim?"levelUp 0.6s ease":"none"}}>
-            <div style={{fontSize:72,animation:"float 3s ease-in-out infinite",filter:"drop-shadow(0 8px 16px rgba(0,0,0,0.3))"}}>{lv.emoji}</div>
-            <div style={{fontFamily:"'Fredoka One',cursive",fontSize:22,color:lv.color}}>{lv.name}</div>
-            <div style={{fontSize:13,color:"#666",fontWeight:700}}>Lv.{lv.level}</div>
-            {levelUpAnim&&<div style={{position:"absolute",top:12,right:12,background:"#FFE135",color:"#333",fontSize:13,fontWeight:800,padding:"4px 10px",borderRadius:20,animation:"pop 0.4s ease"}}>🎉 升級了！</div>}
-          </div>
-          <div style={{background:"rgba(255,255,255,0.1)",borderRadius:20,padding:"16px 20px",backdropFilter:"blur(10px)"}}>
-            <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>我的點數</div>
-            <div style={{fontFamily:"'Fredoka One',cursive",fontSize:52,color:"#FFE135",lineHeight:1}}>{points}<span style={{fontSize:20,marginLeft:4}}>點</span></div>
-            <div style={{marginTop:10}}>
-              <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",marginBottom:6}}>{nextLv?`距離 ${nextLv.name} 還差 ${nextLv.min-points} 點`:"已達最高等級 🏆"}</div>
-              <div style={{height:8,background:"rgba(255,255,255,0.15)",borderRadius:99,overflow:"hidden"}}>
-                <div style={{height:"100%",borderRadius:99,background:lv.color,width:`${Math.min(progress,100)}%`,transition:"width 0.6s ease"}}/>
-              </div>
-            </div>
-          </div>
-          <div style={{display:"flex",gap:10}}>
-            {[{e:"🏅",l:"第一次得點"},{e:"📚",l:"學習達人"},{e:"🌟",l:"連續7天"}].map((b,i)=>(
-              <div key={i} style={{flex:1,background:"rgba(255,255,255,0.1)",borderRadius:16,padding:"12px 8px",textAlign:"center",backdropFilter:"blur(10px)"}}>
-                <div style={{fontSize:24}}>{b.e}</div>
-                <div style={{fontSize:10,color:"rgba(255,255,255,0.7)",marginTop:4,fontWeight:700}}>{b.l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {tab==="shop"&&(
-        <div style={{flex:1,overflowY:"auto",padding:"0 20px 20px"}}>
-          <div style={{background:"rgba(255,255,255,0.1)",borderRadius:14,padding:"12px 16px",fontSize:14,color:"rgba(255,255,255,0.8)",marginBottom:12,backdropFilter:"blur(10px)"}}>
-            我有 <strong style={{color:"#FFE135",fontFamily:"'Fredoka One',cursive",fontSize:18}}>{points}</strong> 點可以用
-          </div>
-          {redeemMsg&&<div style={{borderRadius:14,padding:"12px 16px",fontSize:14,fontWeight:700,marginBottom:12,textAlign:"center",background:redeemMsg.ok?"rgba(74,222,128,0.3)":"rgba(248,113,113,0.3)",color:redeemMsg.ok?"#4ade80":"#f87171"}}>{redeemMsg.text}</div>}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {rewards.map(r=>(
-              <div key={r.id} style={{background:"rgba(255,255,255,0.12)",borderRadius:18,padding:"16px 12px",textAlign:"center",backdropFilter:"blur(10px)",opacity:points<r.cost?0.5:1}}>
-                <div style={{fontSize:32}}>{r.emoji}</div>
-                <div style={{fontSize:12,color:"#fff",fontWeight:700,margin:"6px 0 4px"}}>{r.name}</div>
-                <div style={{fontFamily:"'Fredoka One',cursive",fontSize:16,color:"#FFE135",marginBottom:10}}>{r.cost} 點</div>
-                <button onClick={()=>redeem(r)} disabled={points<r.cost} style={{width:"100%",padding:8,border:"none",borderRadius:10,background:points<r.cost?"rgba(255,255,255,0.1)":"linear-gradient(135deg,#4facfe,#00f2fe)",color:points<r.cost?"rgba(255,255,255,0.5)":"#fff",fontSize:12,fontWeight:800,cursor:points<r.cost?"not-allowed":"pointer",fontFamily:"'Nunito',sans-serif"}}>
-                  {points<r.cost?`差 ${r.cost-points} 點`:"兌換！"}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {tab==="log"&&(
-        <div style={{flex:1,overflowY:"auto",padding:"0 20px 20px",display:"flex",flexDirection:"column",gap:8}}>
-          {history.map(h=>(
-            <div key={h.id} style={{background:"rgba(255,255,255,0.08)",borderRadius:16,padding:"12px 16px",display:"flex",alignItems:"flex-start",gap:12,backdropFilter:"blur(10px)"}}>
-              <div style={{fontSize:24,marginTop:2}}>{h.emoji}</div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:14,fontWeight:700,color:"#fff"}}>{h.event}</div>
-                {h.message&&<div style={{fontSize:12,color:"rgba(255,255,255,0.6)",marginTop:2}}>💬 {h.message}</div>}
-                <div style={{fontSize:11,color:"rgba(255,255,255,0.4)",marginTop:2}}>{h.time}</div>
-              </div>
-              <div style={{fontFamily:"'Fredoka One',cursive",fontSize:20,color:h.points>0?"#4ade80":"#f87171"}}>{h.points>0?`+${h.points}`:h.points}</div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
-  );
+    <EmojiPick val={newEv.emoji} set={v=>setNewEv(n=>({...n,emoji:v}))} opts={EV_EMOJIS}/>
+    <MBtns onCancel={close} onOk={save} okLabel={editEv?"儲存":"新增"}/>
+  </ModalWrap>;
+}
+function RewardModal({editRw,setEditRw,newRw,setNewRw,rewards,setRewards,setRwModal}){
+  const close=()=>{setRwModal(false);setEditRw(null);setNewRw({name:"",cost:"",emoji:"🎁"});};
+  const save=()=>{
+    if(!newRw.name||!newRw.cost)return;
+    const cost=parseInt(newRw.cost);
+    editRw?setRewards(rv=>rv.map(r=>r.id===editRw.id?{...r,name:newRw.name,cost,emoji:newRw.emoji}:r))
+          :setRewards(rv=>[...rv,{id:Date.now(),name:newRw.name,cost,emoji:newRw.emoji}]);
+    close();
+  };
+  return <ModalWrap onClose={close}>
+    <MTtl c={editRw?"編輯獎勵":"新增獎勵"}/>
+    <FI label="名稱" ph="例：買一本漫畫" value={newRw.name} onChange={e=>setNewRw(n=>({...n,name:e.target.value}))}/>
+    <FI label="所需點數" mode="numeric" ph="例：30" value={newRw.cost} onChange={e=>setNewRw(n=>({...n,cost:e.target.value.replace(/[^0-9]/g,"")}))}/>
+    <EmojiPick val={newRw.emoji} set={v=>setNewRw(n=>({...n,emoji:v}))} opts={RW_EMOJIS}/>
+    <MBtns onCancel={close} onOk={save} okLabel={editRw?"儲存":"新增"}/>
+  </ModalWrap>;
+}
+function TaskModal({newTask,setNewTask,tasks,setTasks,setTaskModal}){
+  const close=()=>{setTaskModal(false);setNewTask({name:"",pts:"",emoji:"📋"});};
+  const save=()=>{
+    if(!newTask.name||!newTask.pts)return;
+    setTasks(ts=>[...ts,{id:Date.now(),name:newTask.name,pts:parseInt(newTask.pts),emoji:newTask.emoji,status:"pending"}]);
+    close();
+  };
+  return <ModalWrap onClose={close}>
+    <MTtl c="指派新任務"/>
+    <FI label="任務名稱" ph="例：自己整理書包" value={newTask.name} onChange={e=>setNewTask(n=>({...n,name:e.target.value}))}/>
+    <FI label="完成可得點數" mode="numeric" ph="例：5" value={newTask.pts} onChange={e=>setNewTask(n=>({...n,pts:e.target.value.replace(/[^0-9]/g,"")}))}/>
+    <EmojiPick val={newTask.emoji} set={v=>setNewTask(n=>({...n,emoji:v}))} opts={EV_EMOJIS}/>
+    <MBtns onCancel={close} onOk={save} okLabel="指派"/>
+  </ModalWrap>;
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App/>);
+/* ═════════════════════════════════════════════════ KID ═══ */
+function KidScreen(p){
+  const {tab,setTab,setMode,tasks,kidName}=p;
+  const pt=tasks.filter(t=>t.status==="pending").length;
+  const tabs=[["home","🌟星球"],["tasks","📋任務"+(pt?`(${pt})`:"")],["shop","🛒商城"],["piggy","🐷存款"],["log","📜記錄"]];
+  return <div style={{height:"100%",background:"linear-gradient(180deg,#0f0c29 0%,#302b63 55%,#24243e 100%)",
+    display:"flex",flexDirection:"column",paddingTop:32,overflow:"hidden"}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 18px 5px"}}>
+      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:19,color:"#fff"}}>✨ {kidName}的星球</div>
+      <button onClick={()=>setMode("select")} style={{background:"rgba(255,255,255,.15)",border:"none",borderRadius:18,padding:"4px 13px",fontSize:12,color:"#fff",cursor:"pointer"}}>↩</button>
+    </div>
+    <div style={{display:"flex",margin:"0 18px 9px",background:"rgba(255,255,255,.1)",borderRadius:12,padding:3,gap:2}}>
+      {tabs.map(([k,l])=><button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:"6px 1px",border:"none",borderRadius:9,
+        background:tab===k?"rgba(255,255,255,.25)":"transparent",fontSize:10,color:tab===k?"#fff":"rgba(255,255,255,.55)",
+        cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontWeight:700,whiteSpace:"nowrap",transition:"all .2s"}}>{l}</button>)}
+    </div>
+    <div style={{flex:1,overflowY:"auto",padding:"0 18px 22px"}}>
+      {tab==="home" &&<KidHome  {...p}/>}
+      {tab==="tasks"&&<KidTasks {...p}/>}
+      {tab==="shop" &&<KidShop  {...p}/>}
+      {tab==="piggy"&&<KidPiggy {...p}/>}
+      {tab==="log"  &&<KidLog   {...p}/>}
+    </div>
+  </div>;
+}
+
+function KidHome({lv,nextLv,progress,pts,lvUp,avatar}){
+  return <div style={{display:"flex",flexDirection:"column",gap:13}}>
+    <div style={{borderRadius:22,padding:"18px 14px",display:"flex",flexDirection:"column",alignItems:"center",gap:6,
+      background:lv.bg,animation:lvUp?"levelUp .7s ease":"none",position:"relative"}}>
+      {avatar&&<div style={{width:62,height:62,borderRadius:"50%",overflow:"hidden",border:`4px solid ${lv.color}`,
+        boxShadow:"0 4px 14px rgba(0,0,0,.15)",marginBottom:3}}><img src={avatar} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/></div>}
+      <div style={{fontSize:avatar?36:66,animation:"float 3s ease-in-out infinite",filter:"drop-shadow(0 8px 14px rgba(0,0,0,.2))"}}>{lv.emoji}</div>
+      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:21,color:lv.color}}>{lv.name}</div>
+      <div style={{fontSize:11,color:"#888",fontWeight:700}}>Lv.{lv.level} · {lv.desc}</div>
+      {lvUp&&<div style={{position:"absolute",top:10,right:10,background:"#FFD700",color:"#333",fontSize:11,fontWeight:800,
+        padding:"3px 9px",borderRadius:18,animation:"pop .4s ease"}}>🎉 升級了！</div>}
+    </div>
+
+    <div style={{background:"rgba(255,255,255,.1)",borderRadius:18,padding:"13px 16px",backdropFilter:"blur(10px)"}}>
+      <div style={{fontSize:10,color:"rgba(255,255,255,.55)",fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>我的點數</div>
+      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:46,color:"#FFD700",lineHeight:1.1}}>{pts}<span style={{fontSize:17,marginLeft:3}}>點</span></div>
+      <div style={{fontSize:10,color:"rgba(255,255,255,.55)",margin:"7px 0 4px"}}>{nextLv?`距離 ${nextLv.name} 還差 ${nextLv.min-pts} 點`:"已達最高等級 🏆"}</div>
+      <div style={{height:7,background:"rgba(255,255,255,.14)",borderRadius:99,overflow:"hidden"}}>
+        <div style={{height:"100%",borderRadius:99,background:lv.color,width:`${Math.min(progress,100)}%`,transition:"width .6s ease"}}/>
+      </div>
+    </div>
+
+    <div style={{background:"rgba(255,255,255,.08)",borderRadius:18,padding:"13px 14px",backdropFilter:"blur(10px)"}}>
+      <div style={{fontSize:10,color:"rgba(255,255,255,.55)",fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:13}}>🗺️ 升級路線圖</div>
+      <div style={{display:"flex",alignItems:"flex-start"}}>
+        {LEVELS.map((l,i)=>{
+          const cur=l.level===lv.level,past=l.level<lv.level;
+          return <React.Fragment key={l.level}>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,flex:1}}>
+              <div style={{width:cur?44:30,height:cur?44:30,borderRadius:"50%",
+                background:cur?l.color:past?"rgba(255,255,255,.3)":"rgba(255,255,255,.1)",
+                border:`${cur?3:2}px solid ${cur?l.color:past?"rgba(255,255,255,.5)":"rgba(255,255,255,.2)"}`,
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:cur?22:14,
+                boxShadow:cur?`0 0 16px ${l.color}55`:"none",transition:"all .4s"}}>
+                {past?"✓":l.emoji}
+              </div>
+              <div style={{fontSize:8,color:cur?"#fff":past?"rgba(255,255,255,.65)":"rgba(255,255,255,.3)",
+                fontWeight:cur?800:600,textAlign:"center"}}>{l.name}</div>
+              <div style={{fontSize:7,color:"rgba(255,255,255,.25)"}}>{l.min}pt</div>
+            </div>
+            {i<LEVELS.length-1&&<div style={{flex:.5,height:2,background:past?"rgba(255,255,255,.35)":"rgba(255,255,255,.1)",marginTop:20,flexShrink:0}}/>}
+          </React.Fragment>;
+        })}
+      </div>
+    </div>
+
+    <div style={{display:"flex",gap:9}}>
+      {[{e:"🏅",l:"首次得點"},{e:"📚",l:"學習達人"},{e:"🌟",l:"連續7天"}].map((b,i)=>
+        <div key={i} style={{flex:1,background:"rgba(255,255,255,.1)",borderRadius:14,padding:"9px 5px",textAlign:"center",backdropFilter:"blur(10px)"}}>
+          <div style={{fontSize:20}}>{b.e}</div>
+          <div style={{fontSize:9,color:"rgba(255,255,255,.65)",marginTop:3,fontWeight:700}}>{b.l}</div>
+        </div>)}
+    </div>
+  </div>;
+}
+
+function KidTasks({tasks,setTasks}){
+  const pen=tasks.filter(t=>t.status==="pending");
+  const rep=tasks.filter(t=>t.status==="reported");
+  const don=tasks.filter(t=>t.status==="done").slice(0,3);
+  const card={background:"rgba(255,255,255,.1)",borderRadius:14,padding:"11px 13px",marginBottom:7,backdropFilter:"blur(10px)"};
+  return <div>
+    {pen.length===0&&rep.length===0&&<div style={{textAlign:"center",padding:"44px 16px",color:"rgba(255,255,255,.35)"}}>
+      <div style={{fontSize:44}}>🎉</div>
+      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:17,marginTop:9,color:"rgba(255,255,255,.55)"}}>所有任務完成了！</div>
+    </div>}
+    {pen.length>0&&<><div style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,.55)",textTransform:"uppercase",letterSpacing:1,marginBottom:7}}>我的任務</div>
+      {pen.map(t=><div key={t.id} style={card}>
+        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:9}}>
+          <span style={{fontSize:22}}>{t.emoji}</span>
+          <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700,color:"#fff"}}>{t.name}</div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,.55)"}}>完成可得 <span style={{color:"#FFD700",fontFamily:"'Fredoka One',cursive"}}>+{t.pts}</span> 點</div></div>
+        </div>
+        <button onClick={()=>setTasks(ts=>ts.map(x=>x.id===t.id?{...x,status:"reported"}:x))}
+          style={{width:"100%",padding:"10px 0",border:"none",borderRadius:11,background:"linear-gradient(135deg,#43e97b,#38f9d7)",
+            color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"'Nunito',sans-serif"}}>✋ 我完成了！</button>
+      </div>)}
+    </>}
+    {rep.length>0&&<><div style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,.55)",textTransform:"uppercase",letterSpacing:1,margin:"12px 0 7px"}}>⏳ 等待家長確認</div>
+      {rep.map(t=><div key={t.id} style={{...card,opacity:.65}}>
+        <div style={{display:"flex",alignItems:"center",gap:9}}>
+          <span style={{fontSize:20}}>{t.emoji}</span>
+          <div style={{flex:1,fontSize:12,color:"#fff"}}>{t.name}</div>
+          <div style={{fontSize:10,color:"#FFD700",fontWeight:700}}>等確認中...</div>
+        </div>
+      </div>)}
+    </>}
+    {don.length>0&&<><div style={{fontSize:10,fontWeight:800,color:"rgba(255,255,255,.55)",textTransform:"uppercase",letterSpacing:1,margin:"12px 0 7px"}}>✅ 已完成</div>
+      {don.map(t=><div key={t.id} style={{...card,opacity:.4}}>
+        <div style={{display:"flex",alignItems:"center",gap:9}}>
+          <span style={{fontSize:18}}>{t.emoji}</span>
+          <div style={{flex:1,fontSize:12,color:"#fff"}}>{t.name}</div>
+          <div style={{fontSize:12,color:"#4ade80",fontWeight:700}}>+{t.pts} ✓</div>
+        </div>
+      </div>)}
+    </>}
+  </div>;
+}
+
+function KidShop({rewards,pts,redeem}){
+  return <div>
+    <div style={{background:"rgba(255,255,255,.1)",borderRadius:13,padding:"10px 14px",fontSize:13,color:"rgba(255,255,255,.8)",marginBottom:13,backdropFilter:"blur(10px)"}}>
+      我有 <strong style={{color:"#FFD700",fontFamily:"'Fredoka One',cursive",fontSize:18}}>{pts}</strong> 點可以用
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
+      {rewards.map(r=><div key={r.id} style={{background:"rgba(255,255,255,.12)",borderRadius:16,padding:"14px 10px",textAlign:"center",backdropFilter:"blur(10px)",opacity:pts<r.cost?.42:1,transition:"opacity .2s"}}>
+        <div style={{fontSize:30}}>{r.emoji}</div>
+        <div style={{fontSize:11,color:"#fff",fontWeight:700,margin:"5px 0 3px"}}>{r.name}</div>
+        <div style={{fontFamily:"'Fredoka One',cursive",fontSize:14,color:"#FFD700",marginBottom:9}}>{r.cost}點</div>
+        <button onClick={()=>redeem(r)} disabled={pts<r.cost}
+          style={{width:"100%",padding:"8px 0",border:"none",borderRadius:9,
+            background:pts<r.cost?"rgba(255,255,255,.1)":"linear-gradient(135deg,#4facfe,#00f2fe)",
+            color:pts<r.cost?"rgba(255,255,255,.3)":"#fff",fontSize:11,fontWeight:800,
+            cursor:pts<r.cost?"not-allowed":"pointer",fontFamily:"'Nunito',sans-serif"}}>
+          {pts<r.cost?`差 ${r.cost-pts} 點`:"兌換！"}
+        </button>
+      </div>)}
+    </div>
+  </div>;
+}
+
+function KidPiggy({pts,savings,pigModal,setPigModal,pigInput,setPigInput,deposit}){
+  const total=savings.reduce((s,d)=>s+d.amount,0);
+  return <div>
+    <div style={{background:"rgba(255,255,255,.1)",borderRadius:18,padding:"16px",textAlign:"center",marginBottom:13,backdropFilter:"blur(10px)"}}>
+      <div style={{fontSize:48,animation:"float 3s ease-in-out infinite"}}>🐷</div>
+      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:32,color:"#FFD700",marginTop:3}}>{total}<span style={{fontSize:14}}>點</span></div>
+      <div style={{fontSize:11,color:"rgba(255,255,255,.55)",marginTop:1}}>撲滿裡的存款</div>
+    </div>
+    {savings.map(d=>{
+      const ret=Math.round(d.amount*(1+d.rate));
+      const dp=Math.floor((Date.now()-d.depositDate)/86400000);
+      const pct=Math.min((dp/d.days)*100,100);
+      const m=dp>=d.days;
+      return <div key={d.id} style={{background:"rgba(255,255,255,.1)",borderRadius:14,padding:"12px 14px",marginBottom:7,backdropFilter:"blur(10px)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:m?5:9}}>
+          <span style={{fontSize:22}}>💰</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>{d.amount}點・存{d.days}天</div>
+            <div style={{fontSize:10,color:"rgba(255,255,255,.55)"}}>到期領回 <span style={{color:"#FFD700",fontWeight:700}}>{ret}</span> 點</div>
+          </div>
+          {m&&<span style={{background:"#FFD700",color:"#333",fontSize:9,fontWeight:800,padding:"2px 6px",borderRadius:6}}>到期！</span>}
+        </div>
+        {!m?<div style={{height:5,background:"rgba(255,255,255,.14)",borderRadius:99,overflow:"hidden"}}>
+          <div style={{height:"100%",background:"#FFD700",borderRadius:99,width:`${pct}%`}}/></div>
+          :<div style={{fontSize:11,color:"rgba(255,255,255,.55)",textAlign:"center"}}>🎉 請家長幫你領取利息！</div>}
+      </div>;
+    })}
+    {savings.length===0&&<div style={{textAlign:"center",padding:"14px",color:"rgba(255,255,255,.3)",fontSize:11}}>還沒有存款，點下方按鈕開始存！</div>}
+    <button onClick={()=>setPigModal(true)} disabled={pts<=0}
+      style={{width:"100%",padding:13,border:"none",borderRadius:14,
+        background:pts>0?"linear-gradient(135deg,#f6d365,#fda085)":"rgba(255,255,255,.1)",
+        color:pts>0?"#fff":"rgba(255,255,255,.25)",fontSize:14,fontWeight:800,
+        cursor:pts>0?"pointer":"not-allowed",fontFamily:"'Nunito',sans-serif",marginTop:3}}>🐷 存入點數</button>
+    {pigModal&&<div onClick={()=>setPigModal(false)} style={{position:"absolute",inset:0,background:"rgba(0,0,0,.55)",
+      display:"flex",alignItems:"flex-end",zIndex:60,backdropFilter:"blur(3px)"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"28px 28px 0 0",padding:"22px 18px 36px",width:"100%"}}>
+        <MTtl c="🐷 存入小豬撲滿"/>
+        <div style={{fontSize:12,color:"#888",marginBottom:12}}>目前有 <strong style={{color:"#764ba2"}}>{pts}</strong> 點可以存</div>
+        <FL c="存入點數"/>
+        <input inputMode="numeric" placeholder={`最多 ${pts} 點`} value={pigInput.amount}
+          onChange={e=>setPigInput(s=>({...s,amount:e.target.value.replace(/[^0-9]/g,"")}))}
+          style={{width:"100%",border:"2px solid #eee",borderRadius:12,padding:11,fontSize:22,fontFamily:"'Fredoka One',cursive",outline:"none",textAlign:"center",marginBottom:13}}/>
+        <FL c="存款期限"/>
+        <div style={{display:"flex",gap:7,marginBottom:16}}>
+          {SAVINGS_OPTS.map((o,i)=>{const amt=parseInt(pigInput.amount)||0;const ret=Math.round(amt*(1+o.rate));
+            return <button key={i} onClick={()=>setPigInput(s=>({...s,opt:i}))}
+              style={{flex:1,padding:"9px 3px",border:`2px solid ${pigInput.opt===i?"#764ba2":"#eee"}`,borderRadius:11,
+                background:pigInput.opt===i?"#f0ebff":"#fff",cursor:"pointer",textAlign:"center",fontFamily:"'Nunito',sans-serif"}}>
+              <div style={{fontSize:13,fontWeight:800,color:"#333"}}>{o.label}</div>
+              <div style={{fontSize:11,color:"#764ba2",fontWeight:700}}>{o.bonus}</div>
+              {amt>0&&<div style={{fontSize:9,color:"#aaa",marginTop:1}}>→{ret}點</div>}
+            </button>;})}
+        </div>
+        <MBtns onCancel={()=>setPigModal(false)} onOk={deposit} okLabel="確認存入"/>
+      </div>
+    </div>}
+  </div>;
+}
+
+function KidLog({hist}){
+  return <div style={{display:"flex",flexDirection:"column",gap:7}}>
+    {hist.map(h=><div key={h.id} style={{background:"rgba(255,255,255,.08)",borderRadius:14,padding:"11px 13px",display:"flex",alignItems:"flex-start",gap:10,backdropFilter:"blur(10px)"}}>
+      <div style={{fontSize:20,marginTop:2}}>{h.emoji}</div>
+      <div style={{flex:1}}>
+        <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>{h.event}</div>
+        {h.msg&&<div style={{fontSize:10,color:"rgba(255,255,255,.55)",marginTop:1}}>💬 {h.msg}</div>}
+        <div style={{fontSize:9,color:"rgba(255,255,255,.3)",marginTop:1}}>{h.time}</div>
+      </div>
+      <div style={{fontFamily:"'Fredoka One',cursive",fontSize:17,color:h.pts>0?"#4ade80":"#f87171",whiteSpace:"nowrap"}}>{h.pts>0?`+${h.pts}`:h.pts}</div>
+    </div>)}
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
-<style>
-  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
-  @keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-40px)}}
-  @keyframes levelUp{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
-  @keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
-  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
-</style>
 <script>
-  if('serviceWorker' in navigator){
-    window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js'));
-  }
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js')
+      .then(r=>console.log('SW registered',r.scope))
+      .catch(e=>console.log('SW error',e));
+  });
+}
 </script>
 </body>
 </html>
